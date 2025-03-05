@@ -1,11 +1,11 @@
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Body, Response, Path
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_, or_, func, extract
 from app.database import get_db
 from app.models.operations import Application, ApplicationStatus
 from app.schemas.operations import ApplicationCreate, ApplicationUpdate, Application as ApplicationSchema
-from app.routers.auth import get_current_user
+from app.core.security import get_current_user_with_cookie
 from app.models.users import User
 from datetime import datetime, date, timedelta
 import uuid
@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 router = APIRouter(
     prefix="/applications",
     tags=["applications"],
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(get_current_user_with_cookie)],
     responses={
         401: {"description": "Not authenticated"},
         403: {"description": "Not authorized"},
@@ -41,10 +41,13 @@ class ApplicationStats(BaseModel):
 
 class ApplicationTrend(BaseModel):
     """Daily application trends"""
-    date: date = Field(..., description="Date of the trend data")
-    count: int = Field(..., description="Number of applications for this date")
-    total_value: float = Field(..., description="Total estimated value for this date")
-    total_loan_amount: float = Field(..., description="Total loan amount for this date")
+    date: str
+    count: int
+    total_value: float
+    total_loan: float
+
+    class Config:
+        from_attributes = True
 
 class BulkUpdateRequest(BaseModel):
     """Request model for bulk update operations"""
@@ -109,7 +112,7 @@ async def get_applications(
     sort_by: str = Query("created_at", regex="^(created_at|updated_at|application_number|estimated_value|loan_amount)$", description="Field to sort by"),
     sort_order: str = Query("desc", regex="^(asc|desc)$", description="Sort order (ascending or descending)"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Get list of applications with advanced filtering and sorting"""
     query = db.query(Application)
@@ -190,7 +193,7 @@ async def get_applications(
 async def get_application(
     application_id: int = Path(..., description="ID of the application to retrieve"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Get a specific application by ID"""
     application = db.query(Application).filter(Application.id == application_id).first()
@@ -231,7 +234,7 @@ async def get_application(
 async def create_application(
     application: ApplicationCreate = Body(..., description="Application details to create"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Create a new application"""
     # Generate unique application number
@@ -280,7 +283,7 @@ async def update_application(
     application_id: int = Path(..., description="ID of the application to update"),
     application_update: ApplicationUpdate = Body(..., description="Data to update"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Update an existing application"""
     db_application = db.query(Application).filter(Application.id == application_id).first()
@@ -328,7 +331,7 @@ async def update_application(
 async def delete_application(
     application_id: int = Path(..., description="ID of the application to delete"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Delete an application"""
     db_application = db.query(Application).filter(Application.id == application_id).first()
@@ -380,7 +383,7 @@ async def delete_application(
 async def bulk_update_applications(
     request: BulkUpdateRequest = Body(..., description="Bulk update request data"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Bulk update multiple applications"""
     applications = db.query(Application).filter(Application.id.in_(request.application_ids)).all()
@@ -434,7 +437,7 @@ async def bulk_update_applications(
 async def bulk_delete_applications(
     application_ids: List[int] = Body(..., description="List of application IDs to delete"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Bulk delete multiple applications"""
     applications = db.query(Application).filter(Application.id.in_(application_ids)).all()
@@ -493,7 +496,7 @@ async def get_application_stats(
     start_date: Optional[date] = Query(None, description="Start date for statistics"),
     end_date: Optional[date] = Query(None, description="End date for statistics"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Get application statistics"""
     query = db.query(Application)
@@ -557,7 +560,7 @@ async def get_application_stats(
                         "date": "2024-03-15",
                         "count": 5,
                         "total_value": 5000.0,
-                        "total_loan_amount": 4000.0
+                        "total_loan": 4000.0
                     }]
                 }
             }
@@ -568,7 +571,7 @@ async def get_application_trends(
     days: int = Query(30, ge=1, le=365, description="Number of days to analyze"),
     branch_id: Optional[int] = Query(None, description="Filter trends by branch ID"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Get application trends over time"""
     end_date = date.today()
@@ -578,7 +581,7 @@ async def get_application_trends(
         func.date(Application.created_at).label('date'),
         func.count(Application.id).label('count'),
         func.sum(Application.estimated_value).label('total_value'),
-        func.sum(Application.loan_amount).label('total_loan_amount')
+        func.sum(Application.loan_amount).label('total_loan')
     ).filter(
         Application.created_at >= start_date,
         Application.created_at <= end_date
@@ -598,7 +601,7 @@ async def get_application_trends(
             date=trend.date,
             count=trend.count,
             total_value=float(trend.total_value or 0),
-            total_loan_amount=float(trend.total_loan_amount or 0)
+            total_loan=float(trend.total_loan or 0)
         )
         for trend in trends
     ]
@@ -648,7 +651,7 @@ async def export_applications(
     start_date: Optional[date] = Query(None, description="Start date for export"),
     end_date: Optional[date] = Query(None, description="End date for export"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Export applications in CSV or JSON format"""
     query = db.query(Application)

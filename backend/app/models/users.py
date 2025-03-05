@@ -5,6 +5,7 @@ import uuid
 
 from app.database import Base
 from app.models.organization import Employee
+from app.core.security import verify_password, get_password_hash
 
 # Association table for user-role many-to-many relationship
 user_roles = Table(
@@ -20,7 +21,10 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True)
-    password_hash = Column(String)
+    hashed_password = Column(String)
+    first_name = Column(String)
+    last_name = Column(String)
+    is_superuser = Column(Boolean, default=False)
     role_id = Column(Integer, ForeignKey("roles.id"))
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -32,6 +36,14 @@ class User(Base):
     
     # Audit logs for this user's actions
     audit_logs = relationship("AuditLog", back_populates="user")
+
+    def verify_password(self, password: str) -> bool:
+        """Verify the password against the hash"""
+        return verify_password(password, self.hashed_password)
+
+    def set_password(self, password: str) -> None:
+        """Set the password hash from a plain text password"""
+        self.hashed_password = get_password_hash(password)
 
 
 class Role(Base):

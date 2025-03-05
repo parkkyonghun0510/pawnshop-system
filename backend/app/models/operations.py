@@ -100,6 +100,10 @@ class Item(Base):
     # Appraiser reference
     appraised_by_id = Column(Integer, ForeignKey("employees.id"))
     appraised_by = relationship("Employee", foreign_keys=[appraised_by_id], back_populates="appraised_items")
+    
+    # Application reference
+    application_id = Column(Integer, ForeignKey("applications.id"), nullable=True)
+    application = relationship("Application", back_populates="items")
 
 
 class Loan(Base):
@@ -109,6 +113,7 @@ class Loan(Base):
     loan_number = Column(String, unique=True, index=True)
     customer_id = Column(Integer, ForeignKey("customers.id"))
     item_id = Column(Integer, ForeignKey("items.id"))
+    application_id = Column(Integer, ForeignKey("applications.id"), nullable=True)
     principal_amount = Column(Numeric(10, 2))
     interest_rate = Column(Float)  # Monthly interest rate as a percentage
     term_days = Column(Integer)    # Loan duration in days
@@ -128,6 +133,7 @@ class Loan(Base):
     customer = relationship("Customer", back_populates="loans")
     item = relationship("Item", back_populates="loan")
     payments = relationship("Payment", back_populates="loan")
+    application = relationship("Application", back_populates="loan")
 
 
 class Payment(Base):
@@ -184,7 +190,7 @@ class Application(Base):
     application_number = Column(String, unique=True, index=True)
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
     branch_id = Column(Integer, ForeignKey("branches.id"), nullable=False)
-    item_type_id = Column(Integer, ForeignKey("item_categories.id"), nullable=False)
+    item_category = Column(Enum(ItemCategory), nullable=False)
     item_description = Column(Text, nullable=False)
     estimated_value = Column(Float, nullable=False)
     loan_amount = Column(Float, nullable=False)
@@ -201,6 +207,6 @@ class Application(Base):
     # Relationships
     customer = relationship("Customer", back_populates="applications")
     branch = relationship("Branch", back_populates="applications")
-    item_type = relationship("ItemCategory", back_populates="applications")
     processed_by = relationship("Employee", foreign_keys=[processed_by_id], back_populates="processed_applications")
-    loan = relationship("Loan", back_populates="application", uselist=False) 
+    loan = relationship("Loan", back_populates="application", uselist=False)
+    items = relationship("Item", back_populates="application") 

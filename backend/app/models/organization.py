@@ -34,6 +34,7 @@ class Branch(Base):
     employees = relationship("Employee", foreign_keys="Employee.branch_id", back_populates="branch")
     inventory = relationship("Item", back_populates="branch")
     transactions = relationship("Transaction", back_populates="branch")
+    applications = relationship("Application", back_populates="branch")
 
 
 class Employee(Base):
@@ -56,4 +57,7 @@ class Employee(Base):
     processed_transactions = relationship("Transaction", foreign_keys="Transaction.processed_by_id", back_populates="processed_by")
     
     # Items appraised by this employee
-    appraised_items = relationship("Item", foreign_keys="Item.appraised_by_id", back_populates="appraised_by") 
+    appraised_items = relationship("Item", foreign_keys="Item.appraised_by_id", back_populates="appraised_by")
+    
+    # Applications processed by this employee
+    processed_applications = relationship("Application", foreign_keys="Application.processed_by_id", back_populates="processed_by") 

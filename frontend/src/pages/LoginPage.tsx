@@ -20,10 +20,16 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!username || !password) {
+      setError('Username and password are required');
+      return;
+    }
+    
     try {
       await login(username, password);
       navigate('/');
     } catch (err) {
+      console.error('Login error:', err);
       setError('Invalid username or password');
     }
   };
