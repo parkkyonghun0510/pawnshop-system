@@ -26,6 +26,7 @@
     "axios": "^1.8.1",
     "chart.js": "^4.4.0",
     "date-fns": "^2.30.0",
+    "dayjs": "^1.11.13",
     "formik": "^2.4.5",
     "js-cookie": "^3.0.5",
     "jwt-decode": "^4.0.0",

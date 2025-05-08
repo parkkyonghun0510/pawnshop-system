@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
+import DashboardPage from './pages/DashboardPageWrapper';
 import UsersPage from './pages/UsersPage';
 import CustomersPage from './pages/CustomersPage';
 import LoansPage from './pages/LoansPage';
@@ -144,4 +144,4 @@ const App = () => {
     );
 };
 
-export default App; 
+export default App;

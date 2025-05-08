@@ -2,7 +2,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Dict, Any
 
-from fastapi import FastAPI, Request, status, Depends, Response, HTTPException
+from fastapi import FastAPI, Request, status, Depends, Response, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -13,6 +13,7 @@ from app.routers import users, branches, employees, customers, transactions, loa
 from app.models.users import User, Role
 from app.core.config import settings
 from app.core.security import create_access_token, verify_password, get_current_user_with_cookie
+from app.websockets.dashboard import dashboard_manager
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -174,3 +175,15 @@ async def logout(response: Response):
         samesite="lax",
     )
     return {"message": "Successfully logged out"}
+
+
+@app.websocket("/ws/dashboard")
+async def websocket_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for real-time dashboard updates"""
+    await dashboard_manager.connect(websocket)
+    try:
+        while True:
+            # Keep the connection alive
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        dashboard_manager.disconnect(websocket)
