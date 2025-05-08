@@ -55,7 +55,7 @@ class Payment(PaymentBase):
     updated_at: Optional[datetime] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class LoanBase(BaseModel):
@@ -123,7 +123,7 @@ class Loan(LoanBase):
     payments: List[Payment] = []
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class LoanWithDetails(Loan):
@@ -161,4 +161,4 @@ class LoanStats(BaseModel):
     avg_loan_amount: float
     avg_loan_term: float
     loans_by_status: Dict[str, int]
-    loans_by_month: List[Dict[str, Union[str, int, float]]] 
+    loans_by_month: List[Dict[str, Union[str, int, float]]]

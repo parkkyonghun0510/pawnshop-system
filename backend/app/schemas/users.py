@@ -69,7 +69,7 @@ class UserResponse(UserInDBBase):
 
 class UserInDB(UserInDBBase):
     """Schema for user with hashed password in DB"""
-    hashed_password: str
+    password_hash: str
 
 
 class RoleBase(BaseModel):
@@ -121,4 +121,4 @@ class Permission(PermissionBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
-    model_config = ConfigDict(from_attributes=True) 
+    model_config = ConfigDict(from_attributes=True)

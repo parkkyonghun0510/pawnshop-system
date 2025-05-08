@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import List
-from fastapi import HTTPException, Depends
+from fastapi import HTTPException, Depends # type: ignore
 from functools import wraps
 
 class Permission(str, Enum):

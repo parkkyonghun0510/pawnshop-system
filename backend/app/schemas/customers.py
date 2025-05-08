@@ -51,7 +51,7 @@ class Customer(CustomerBase):
     updated_at: Optional[datetime] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class CustomerInDB(Customer):
@@ -81,4 +81,4 @@ class CustomerStats(BaseModel):
     new_customers_this_month: int
     new_customers_this_year: int
     top_customers_by_loan_count: List[Customer]
-    top_customers_by_loan_amount: List[Customer] 
+    top_customers_by_loan_amount: List[Customer]

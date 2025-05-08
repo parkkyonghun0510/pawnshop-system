@@ -32,17 +32,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(auth.router, prefix="/auth", tags=["authentication"])
-app.include_router(users.router, prefix="/users", tags=["users"])
-app.include_router(branches.router, prefix="/branches", tags=["branches"])
-app.include_router(employees.router, prefix="/employees", tags=["employees"])
-app.include_router(customers.router, prefix="/customers", tags=["customers"])
-app.include_router(transactions.router, prefix="/transactions", tags=["transactions"])
-app.include_router(loans.router, prefix="/loans", tags=["loans"])
-app.include_router(collaterals.router, prefix="/collaterals", tags=["collaterals"])
-app.include_router(payments.router, prefix="/payments", tags=["payments"])
-app.include_router(applications.router, prefix="/applications", tags=["applications"])
+# Include routers with API version prefix
+api_prefix = settings.API_V1_STR
+
+app.include_router(auth.router, prefix=f"{api_prefix}/auth", tags=["authentication"])
+app.include_router(users.router, prefix=f"{api_prefix}/users", tags=["users"])
+app.include_router(branches.router, prefix=f"{api_prefix}/branches", tags=["branches"])
+app.include_router(employees.router, prefix=f"{api_prefix}/employees", tags=["employees"])
+app.include_router(customers.router, prefix=f"{api_prefix}/customers", tags=["customers"])
+app.include_router(transactions.router, prefix=f"{api_prefix}/transactions", tags=["transactions"])
+app.include_router(loans.router, prefix=f"{api_prefix}/loans", tags=["loans"])
+app.include_router(collaterals.router, prefix=f"{api_prefix}/collaterals", tags=["collaterals"])
+app.include_router(payments.router, prefix=f"{api_prefix}/payments", tags=["payments"])
+app.include_router(applications.router, prefix=f"{api_prefix}/applications", tags=["applications"])
 
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
@@ -65,7 +67,7 @@ async def root():
     }
 
 
-@app.post("/token", response_model=Dict[str, Any])
+@app.post(f"{api_prefix}/token", response_model=Dict[str, Any])
 async def login_for_access_token(
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -77,10 +79,10 @@ async def login_for_access_token(
     
     # First try username
     user = db.query(User).filter(User.username == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    if not user or not verify_password(form_data.password, user.password_hash):
         # Try email
         user = db.query(User).filter(User.email == form_data.username).first()
-        if not user or not verify_password(form_data.password, user.hashed_password):
+        if not user or not verify_password(form_data.password, user.password_hash):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect username/email or password",
@@ -110,8 +112,6 @@ async def login_for_access_token(
             "id": user.id,
             "username": user.username,
             "email": user.email,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
             "is_active": user.is_active,
             "is_superuser": user.is_superuser,
             "role_id": user.role_id
@@ -119,7 +119,7 @@ async def login_for_access_token(
     }
 
 
-@app.get("/users/me")
+@app.get(f"{api_prefix}/users/me")
 async def read_users_me(
     request: Request,
     current_user = Depends(get_current_user_with_cookie)
@@ -129,8 +129,6 @@ async def read_users_me(
         "id": current_user.id,
         "username": current_user.username,
         "email": current_user.email,
-        "first_name": current_user.first_name,
-        "last_name": current_user.last_name,
         "is_active": current_user.is_active,
         "is_superuser": current_user.is_superuser,
         "role_id": current_user.role_id,
@@ -142,7 +140,7 @@ async def read_users_me(
     }
 
 
-@app.post("/auth/logout")
+@app.post(f"{api_prefix}/auth/logout")
 async def logout(response: Response):
     """Endpoint to logout user"""
     response.delete_cookie(
@@ -150,4 +148,4 @@ async def logout(response: Response):
         path="/",
         samesite="lax",
     )
-    return {"message": "Successfully logged out"} 
+    return {"message": "Successfully logged out"}

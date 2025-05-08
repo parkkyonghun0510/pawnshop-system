@@ -28,7 +28,7 @@ class EmployeeType(EmployeeTypeBase):
     updated_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # Employee Schemas
@@ -60,7 +60,7 @@ class Employee(EmployeeBase):
     updated_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class EmployeeWithDetails(Employee):
@@ -88,4 +88,4 @@ class EmployeeStats(BaseModel):
     active_employees: int
     employees_by_branch: Dict[str, int]
     employees_by_type: Dict[str, int]
-    employees_by_hire_month: List[Dict[str, Union[str, int]]] 
+    employees_by_hire_month: List[Dict[str, Union[str, int]]]

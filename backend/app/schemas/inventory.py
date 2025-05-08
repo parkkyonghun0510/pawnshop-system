@@ -49,7 +49,7 @@ class ItemAttribute(ItemAttributeBase):
     item_id: int
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class ItemPhotoBase(BaseModel):
@@ -78,7 +78,7 @@ class ItemPhoto(ItemPhotoBase):
     created_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class ItemBase(BaseModel):
@@ -127,7 +127,7 @@ class Item(ItemBase):
     photos: Optional[List[ItemPhoto]] = []
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class ItemSearchParams(BaseModel):
@@ -151,4 +151,4 @@ class ItemStats(BaseModel):
     total_inventory_value: float
     avg_item_value: float
     items_added_this_month: int
-    items_sold_this_month: int 
+    items_sold_this_month: int

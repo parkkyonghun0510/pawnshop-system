@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.database import get_db
 
 # Setup password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__default_rounds=12)
 
 # Token-related constants
 ALGORITHM = "HS256"

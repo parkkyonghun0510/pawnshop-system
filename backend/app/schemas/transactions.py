@@ -69,7 +69,7 @@ class Transaction(TransactionBase):
     updated_at: Optional[datetime] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class TransactionWithDetails(Transaction):
@@ -104,4 +104,4 @@ class TransactionStats(BaseModel):
     transactions_by_status: Dict[str, int]
     transactions_by_payment_method: Dict[str, int]
     daily_transactions: List[Dict[str, Union[str, int, float]]]
-    monthly_transactions: List[Dict[str, Union[str, int, float]]] 
+    monthly_transactions: List[Dict[str, Union[str, int, float]]]

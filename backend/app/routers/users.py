@@ -34,8 +34,6 @@ def read_users(
     db: Session = Depends(get_db),
     skip: int = 0,
     limit: int = 100,
-    first_name: Optional[str] = Query(None),
-    last_name: Optional[str] = Query(None),
     email: Optional[str] = Query(None),
     username: Optional[str] = Query(None),
     current_user = Depends(get_current_user_with_cookie)
@@ -53,10 +51,6 @@ def read_users(
     # Build query with filters
     query = db.query(User)
     
-    if first_name:
-        query = query.filter(User.first_name.ilike(f"%{first_name}%"))
-    if last_name:
-        query = query.filter(User.last_name.ilike(f"%{last_name}%"))
     if email:
         query = query.filter(User.email.ilike(f"%{email}%"))
     if username:
@@ -87,13 +81,11 @@ def create_user(
     db_user = User(
         email=user_in.email,
         username=user_in.username,
-        hashed_password=get_password_hash(user_in.password),
-        first_name=user_in.first_name,
-        last_name=user_in.last_name,
         is_active=user_in.is_active,
         is_superuser=user_in.is_superuser,
         role_id=user_in.role_id
     )
+    db_user.set_password(user_in.password)
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
@@ -157,10 +149,6 @@ def update_user(
         user.email = user_in.email
     if user_in.username is not None:
         user.username = user_in.username
-    if user_in.first_name is not None:
-        user.first_name = user_in.first_name
-    if user_in.last_name is not None:
-        user.last_name = user_in.last_name
     if user_in.is_active is not None:
         user.is_active = user_in.is_active
     
@@ -173,7 +161,7 @@ def update_user(
     
     # Update password if provided
     if user_in.password:
-        user.hashed_password = get_password_hash(user_in.password)
+        user.set_password(user_in.password)
     
     db.add(user)
     db.commit()
@@ -433,4 +421,4 @@ def delete_permission(
     
     db.delete(permission)
     db.commit()
-    return permission 
+    return permission

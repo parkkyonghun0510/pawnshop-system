@@ -78,8 +78,6 @@ async def login(
             "id": user.id,
             "username": user.username,
             "email": user.email,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
             "is_active": user.is_active,
             "is_superuser": user.is_superuser,
             "role": {
@@ -165,8 +163,6 @@ def register_new_user(
     db_user = User(
         email=user_in.email,
         username=user_in.username,
-        first_name=user_in.first_name,
-        last_name=user_in.last_name,
         is_active=True,
         is_superuser=False,
         role_id=user_in.role_id
@@ -252,8 +248,6 @@ async def verify_token(current_user: User = Depends(get_current_user_with_cookie
         "id": current_user.id,
         "username": current_user.username,
         "email": current_user.email,
-        "first_name": current_user.first_name,
-        "last_name": current_user.last_name,
         "is_active": current_user.is_active,
         "is_superuser": current_user.is_superuser,
         "role": {
@@ -265,4 +259,4 @@ async def verify_token(current_user: User = Depends(get_current_user_with_cookie
                 for perm in ROLE_PERMISSIONS.get(current_user.role.name.lower(), [])
             ]
         } if current_user.role else None
-    } 
+    }

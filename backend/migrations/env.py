@@ -1,12 +1,16 @@
 from logging.config import fileConfig
 import os
 import sys
+import logging
 from dotenv import load_dotenv
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
+
+# Set up logger
+logger = logging.getLogger("alembic.env")
 
 # Load environment variables from .env file
 load_dotenv()
@@ -17,15 +21,22 @@ config = context.config
 
 # Get the database URL from environment variable
 db_url = os.getenv('DATABASE_URL')
+
+# Check if DATABASE_URL is set
+if not db_url:
+    logger.error("DATABASE_URL environment variable not set!")
+    raise ValueError("DATABASE_URL environment variable not set. Please set it in your .env file.")
+
 # Handle case where the value might include 'DATABASE_URL=' prefix
-if db_url and db_url.startswith('DATABASE_URL='):
+if db_url.startswith('DATABASE_URL='):
     db_url = db_url.split('=', 1)[1]
 
 # Set the database URL in Alembic config
 config.set_main_option('sqlalchemy.url', db_url)
 
 # Add the app directory to the Python path so we can import modules
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+base_path = os.path.dirname(os.path.dirname(__file__))
+sys.path.insert(0, base_path)
 
 # Import Base from database module
 from app.database import Base
@@ -51,14 +62,13 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
 target_metadata = Base.metadata
 
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
+# Define a name filter function for Alembic
+def include_name(name, type_, parent_names):
+    # You can customize this function to filter specific tables or columns
+    # For now, include everything
+    return True
 
 
 def run_migrations_offline() -> None:
@@ -71,12 +81,12 @@ def run_migrations_offline() -> None:
 
     Calls to context.execute() here emit the given string to the
     script output.
-
     """
-    # For offline migration generation, we don't need to connect to the DB
-    # Just set a valid URL format for PostgreSQL
+    url = config.get_main_option("sqlalchemy.url")
+    logger.info(f"Running migrations offline with URL template: {url}")
+    
     context.configure(
-        url="postgresql://postgres:123456@localhost:5432/pawnshop",
+        url=url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -84,8 +94,7 @@ def run_migrations_offline() -> None:
         compare_type=True,
         render_as_batch=True,
         include_schemas=True,
-        # Add this to handle enum types in offline mode
-        include_name=True,
+        include_name=include_name,
     )
 
     with context.begin_transaction():
@@ -97,10 +106,14 @@ def run_migrations_online() -> None:
 
     In this scenario we need to create an Engine
     and associate a connection with the context.
-
     """
+    logger.info("Running migrations online")
+    
+    # Override with environment variables if available
+    section = config.get_section(config.config_ini_section, {})
+    
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        section,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
@@ -113,7 +126,7 @@ def run_migrations_online() -> None:
             compare_type=True,
             render_as_batch=True,
             include_schemas=True,
-            include_name=True,
+            include_name=include_name,
         )
 
         with context.begin_transaction():

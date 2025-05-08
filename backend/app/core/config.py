@@ -8,7 +8,9 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Pawn Shop Management System"
-    API_V1_STR: str = "/api/v1"
+    API_VERSION: str = os.getenv("API_VERSION", "v1")
+    API_V1_STR: str = f"/api/{API_VERSION}"
+    PREFECT_API_URL: str = os.getenv("PREFECT_API_URL", "http://localhost:4200/api")
     
     # CORS Configuration
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:8000"
@@ -72,4 +74,4 @@ class Settings(BaseSettings):
 
 
 # Create global settings object
-settings = Settings() 
+settings = Settings()

@@ -52,4 +52,4 @@ class PasswordReset(BaseModel):
 class PasswordChange(BaseModel):
     """Schema for password change"""
     current_password: str
-    new_password: str 
+    new_password: str

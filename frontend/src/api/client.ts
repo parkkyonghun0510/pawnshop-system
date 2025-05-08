@@ -1,8 +1,10 @@
 import axios, { AxiosError, AxiosResponse } from 'axios';
 import Cookies from 'js-cookie';
 
-// API base URL from environment variable
+// API configuration from environment variables
 const API_URL = import.meta.env.VITE_APP_API_URL || 'http://localhost:8000';
+const API_VERSION = import.meta.env.VITE_APP_API_VERSION || 'v1';
+const API_BASE_URL = `${API_URL}/api/${API_VERSION}`;
 
 // Rate limiting configuration
 const RATE_LIMIT = {
@@ -13,7 +15,7 @@ const RATE_LIMIT = {
 
 // Create axios instance
 const apiClient = axios.create({
-    baseURL: API_URL,
+    baseURL: API_BASE_URL,
     withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
@@ -27,14 +29,14 @@ const apiClient = axios.create({
 const isRateLimited = (endpoint: string): boolean => {
     const now = Date.now();
     const requests = RATE_LIMIT.requests.get(endpoint) || [];
-    
+
     // Remove old requests outside the window
     const validRequests = requests.filter(time => now - time < RATE_LIMIT.perWindow);
-    
+
     if (validRequests.length >= RATE_LIMIT.maxRequests) {
         return true;
     }
-    
+
     // Add current request
     validRequests.push(now);
     RATE_LIMIT.requests.set(endpoint, validRequests);
@@ -52,7 +54,7 @@ apiClient.interceptors.request.use(
 
         // Get token from cookie
         const token = Cookies.get('access_token');
-        
+
         // If token exists, add it to Authorization header
         if (token && config.headers) {
             config.headers.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
@@ -70,7 +72,7 @@ apiClient.interceptors.request.use(
             config.headers['X-Frame-Options'] = 'DENY';
             config.headers['X-XSS-Protection'] = '1; mode=block';
         }
-        
+
         return config;
     },
     (error: AxiosError) => Promise.reject(error)
@@ -94,7 +96,7 @@ apiClient.interceptors.response.use(
             if (status === 401) {
                 Cookies.remove('access_token', { path: '/' });
                 Cookies.remove('csrf_token', { path: '/' });
-                
+
                 if (window.location.pathname !== '/login') {
                     window.location.href = '/login';
                 }
@@ -152,4 +154,4 @@ export const formDataToURLSearchParams = (formData: FormData): string => {
     return params.toString();
 };
 
-export default apiClient; 
+export default apiClient;

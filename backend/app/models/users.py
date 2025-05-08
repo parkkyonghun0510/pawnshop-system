@@ -21,9 +21,9 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True)
-    hashed_password = Column(String)
-    first_name = Column(String)
-    last_name = Column(String)
+    password_hash = Column(String)
+    first_name = Column(String(50), nullable=True)
+    last_name = Column(String(50), nullable=True)
     is_superuser = Column(Boolean, default=False)
     role_id = Column(Integer, ForeignKey("roles.id"))
     is_active = Column(Boolean, default=True)
@@ -39,11 +39,11 @@ class User(Base):
 
     def verify_password(self, password: str) -> bool:
         """Verify the password against the hash"""
-        return verify_password(password, self.hashed_password)
+        return verify_password(password, self.password_hash)
 
     def set_password(self, password: str) -> None:
         """Set the password hash from a plain text password"""
-        self.hashed_password = get_password_hash(password)
+        self.password_hash = get_password_hash(password)
 
 
 class Role(Base):
@@ -96,4 +96,4 @@ class AuditLog(Base):
     details = Column(String)
     
     # Relationships
-    user = relationship("User", back_populates="audit_logs") 
+    user = relationship("User", back_populates="audit_logs")
