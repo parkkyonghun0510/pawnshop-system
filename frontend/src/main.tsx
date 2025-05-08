@@ -22,7 +22,7 @@ const queryClient = new QueryClient({
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter future={{ v7_startTransition: true }}>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <ThemeProvider theme={theme}>
           <AuthProvider>
             {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
@@ -33,4 +33,4 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       </BrowserRouter>
     </QueryClientProvider>
   </React.StrictMode>,
-); 
+);

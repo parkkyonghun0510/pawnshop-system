@@ -28,14 +28,28 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=[
+        "Content-Type",
+        "Authorization",
+        "Accept",
+        "Accept-Language",
+        "Content-Language",
+        "Origin",
+        "X-Requested-With",
+        "X-CSRF-Token",
+        "X-Content-Type-Options",
+        "X-Frame-Options",
+        "X-XSS-Protection"
+    ],
+    expose_headers=["Content-Type", "Authorization", "Set-Cookie"],
+    max_age=600  # Cache preflight requests for 10 minutes
 )
 
 # Include routers with API version prefix
 api_prefix = settings.API_V1_STR
 
-app.include_router(auth.router, prefix="/api/v1/authentication")
+app.include_router(auth.router, prefix=f"{api_prefix}/authentication", tags=["Authentication"])
 app.include_router(users.router, prefix=f"{api_prefix}/users", tags=["users"])
 app.include_router(branches.router, prefix=f"{api_prefix}/branches", tags=["branches"])
 app.include_router(employees.router, prefix=f"{api_prefix}/employees", tags=["employees"])
@@ -50,10 +64,19 @@ app.include_router(reports.router, prefix=f"{api_prefix}/dashboard", tags=["repo
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
     """Middleware to add X-Process-Time header to responses"""
+    # Debug cookies and headers
+    print(f"Request path: {request.url.path}")
+    print(f"Request cookies: {request.cookies}")
+    print(f"Request headers: {request.headers}")
+
     start_time = time.time()
     response = await call_next(request)
     process_time = time.time() - start_time
     response.headers["X-Process-Time"] = str(process_time)
+
+    # Debug response headers
+    print(f"Response headers: {response.headers}")
+
     return response
 
 
@@ -77,7 +100,7 @@ async def login_for_access_token(
     """Endpoint for OAuth2 compatible login"""
     # Try to authenticate with username or email
     user = None
-    
+
     # First try username
     user = db.query(User).filter(User.username == form_data.username).first()
     if not user or not verify_password(form_data.password, user.password_hash):
@@ -94,18 +117,19 @@ async def login_for_access_token(
     access_token = create_access_token(
         subject=user.username, expires_delta=access_token_expires
     )
-    
+
     # Set cookie
     response.set_cookie(
         key="access_token",
-        value=access_token,
+        value=f"Bearer {access_token}",
         httponly=True,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         expires=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",  # Important: set the path to root
         samesite="lax",
         secure=False,  # Set to True in production with HTTPS
     )
-    
+
     return {
         "access_token": access_token,
         "token_type": "bearer",

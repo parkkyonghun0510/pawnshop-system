@@ -29,11 +29,12 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+
     # Relationships
+    role = relationship("Role", foreign_keys=[role_id])
     roles = relationship("Role", secondary=user_roles, back_populates="users")
     employee = relationship("Employee", uselist=False, back_populates="user")
-    
+
     # Audit logs for this user's actions
     audit_logs = relationship("AuditLog", back_populates="user")
 
@@ -54,7 +55,7 @@ class Role(Base):
     description = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+
     # Relationships
     users = relationship("User", secondary=user_roles, back_populates="roles")
     permissions = relationship("Permission", secondary="role_permissions", back_populates="roles")
@@ -77,7 +78,7 @@ class Permission(Base):
     description = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+
     # Relationships
     roles = relationship("Role", secondary="role_permissions", back_populates="permissions")
 
@@ -94,6 +95,6 @@ class AuditLog(Base):
     ip_address = Column(String)
     user_agent = Column(String)
     details = Column(String)
-    
+
     # Relationships
     user = relationship("User", back_populates="audit_logs")

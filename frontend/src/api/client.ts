@@ -54,10 +54,16 @@ apiClient.interceptors.request.use(
 
         // Get token from cookie
         const token = Cookies.get('access_token');
+        console.log('Token from cookie in interceptor:', token);
 
         // If token exists, add it to Authorization header
         if (token && config.headers) {
-            config.headers.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+            // Make sure to handle the 'Bearer ' prefix correctly
+            const authToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+            console.log('Setting Authorization header:', authToken);
+            config.headers.Authorization = authToken;
+        } else {
+            console.log('No token found in cookie');
         }
 
         // Get CSRF token if it exists

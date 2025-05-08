@@ -69,7 +69,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Function to fetch the user profile
     const fetchUserProfile = async () => {
         try {
-            const response = await api.get('authentication/auth/me', { withCredentials: true });
+            console.log('Fetching user profile...');
+            console.log('Cookie value:', Cookies.get('access_token'));
+
+            // Get all cookies for debugging
+            const allCookies = Cookies.get();
+            console.log('All cookies:', allCookies);
+
+            const response = await api.get('authentication/auth/me', {
+                withCredentials: true,
+                headers: {
+                    // Explicitly set the Authorization header with the cookie value
+                    'Authorization': `Bearer ${Cookies.get('access_token')?.replace('Bearer ', '')}`
+                }
+            });
+            console.log('User profile response:', response.data);
             setUser(response.data);
             return true;
         } catch (err) {
@@ -116,8 +130,47 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setError(null);
 
         try {
-            const response = await api.post('authentication/auth/login', { email, password }, { withCredentials: true });
+            console.log('Attempting login with email:', email);
+
+            // Use the authService to login
+            const response = await api.post('authentication/auth/token',
+                new URLSearchParams({
+                    'username': email, // OAuth2 spec uses 'username' even for email
+                    'password': password
+                }).toString(),
+                {
+                    withCredentials: true,
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    }
+                }
+            );
+
+            console.log('Login response:', response);
+
+            // Check if the cookie was set
+            console.log('Cookie after login:', Cookies.get('access_token'));
+
+            // Get all cookies for debugging
+            const allCookies = Cookies.get();
+            console.log('All cookies after login:', allCookies);
+
             if (response.status === 200) {
+                // Add a small delay to ensure cookie is set
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                // Check cookies again after delay
+                console.log('Cookie after delay:', Cookies.get('access_token'));
+
+                // If cookie is not set, manually set it
+                if (!Cookies.get('access_token') && response.data.access_token) {
+                    console.log('Manually setting cookie with token:', response.data.access_token);
+                    Cookies.set('access_token', `Bearer ${response.data.access_token}`, {
+                        path: '/',
+                        sameSite: 'lax'
+                    });
+                }
+
                 const success = await fetchUserProfile();
                 if (success) {
                     navigate('/dashboard');
@@ -133,7 +186,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Logout function
     const logout = async () => {
         try {
-            await api.post('/auth/logout', {}, { withCredentials: true });
+            await api.post('authentication/auth/logout', {}, { withCredentials: true });
         } catch (err) {
             console.error('Logout error:', err);
         }

@@ -18,15 +18,21 @@ export const authService = {
     login: async (credentials: LoginCredentials): Promise<ApiResponse<{ access_token: string }>> => {
         try {
             console.log('Attempting login with URL:', import.meta.env.VITE_APP_API_URL);
+
+            // Create form data for OAuth2 password flow
             const formData = new URLSearchParams();
-            formData.append('username', credentials.username);
+            formData.append('username', credentials.username); // OAuth2 spec uses 'username' even for email
             formData.append('password', credentials.password);
 
-            const response = await apiClient.post('authentication/token', formData.toString(), {
+            console.log('Sending login request with form data');
+
+            const response = await apiClient.post('authentication/auth/token', formData.toString(), {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
+                withCredentials: true, // Important for cookie handling
             });
+
             console.log('Login response:', response.data);
             return response.data;
         } catch (error: any) {
@@ -36,12 +42,12 @@ export const authService = {
     },
 
     logout: async (): Promise<void> => {
-        await apiClient.post('authentication/logout');
+        await apiClient.post('authentication/auth/logout');
     },
 
     getCurrentUser: async (): Promise<ApiResponse<User>> => {
         try {
-            const response = await apiClient.get('authentication/me');
+            const response = await apiClient.get('authentication/auth/me');
             return response.data;
         } catch (error: any) {
             console.error('Get current user error:', error.response?.data || error.message);
@@ -51,7 +57,7 @@ export const authService = {
 
     verifyToken: async (): Promise<ApiResponse<boolean>> => {
         try {
-            const response = await apiClient.get('authentication/verify');
+            const response = await apiClient.get('authentication/auth/verify');
             return response.data;
         } catch (error: any) {
             console.error('Token verification error:', error.response?.data || error.message);
