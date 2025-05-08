@@ -1,5 +1,4 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -17,7 +16,7 @@ const App = () => {
     return (
         <Routes>
             <Route path="/login" element={<LoginPage />} />
-            
+
             {/* Protected Routes */}
             <Route
                 path="/dashboard"
@@ -27,7 +26,7 @@ const App = () => {
                     </ProtectedRoute>
                 }
             />
-            
+
             <Route
                 path="/users"
                 element={
@@ -39,7 +38,7 @@ const App = () => {
                     </ProtectedRoute>
                 }
             />
-            
+
             <Route
                 path="/customers"
                 element={
@@ -51,7 +50,7 @@ const App = () => {
                     </ProtectedRoute>
                 }
             />
-            
+
             <Route
                 path="/loans"
                 element={
@@ -63,7 +62,7 @@ const App = () => {
                     </ProtectedRoute>
                 }
             />
-            
+
             <Route
                 path="/inventory"
                 element={
@@ -75,7 +74,7 @@ const App = () => {
                     </ProtectedRoute>
                 }
             />
-            
+
             <Route
                 path="/transactions"
                 element={
@@ -87,7 +86,7 @@ const App = () => {
                     </ProtectedRoute>
                 }
             />
-            
+
             <Route
                 path="/reports"
                 element={
@@ -99,7 +98,7 @@ const App = () => {
                     </ProtectedRoute>
                 }
             />
-            
+
             <Route
                 path="/branches"
                 element={
@@ -111,7 +110,7 @@ const App = () => {
                     </ProtectedRoute>
                 }
             />
-            
+
             <Route
                 path="/employees"
                 element={
@@ -123,7 +122,7 @@ const App = () => {
                     </ProtectedRoute>
                 }
             />
-            
+
             <Route
                 path="/applications"
                 element={
@@ -135,7 +134,7 @@ const App = () => {
                     </ProtectedRoute>
                 }
             />
-            
+
             {/* Redirect root to dashboard */}
             <Route
                 path="/"

@@ -3,7 +3,8 @@ from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Body, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func, extract, and_, or_, desc
+from sqlalchemy import func, extract, and_, or_, desc, column, literal
+from sqlalchemy.ext.asyncio import AsyncSession
 from io import StringIO
 import csv
 import json
@@ -87,6 +88,39 @@ class DashboardStats(BaseModel):
     defaulted_loans: int
     revenue_by_day: List[Dict[str, Union[str, float]]]
     loan_applications_by_day: List[Dict[str, Union[str, int]]]
+
+
+class BranchPerformance(BaseModel):
+    name: str
+    loans: int
+    revenue: float
+    items: int
+
+class InventoryStatus(BaseModel):
+    name: str
+    value: int
+    color: str
+
+class RecentTransaction(BaseModel):
+    id: int
+    customer: str
+    type: str
+    amount: float
+    date: datetime
+    status: str
+
+class UpcomingDueLoan(BaseModel):
+    id: int
+    customer: str
+    amount: float
+    due_date: datetime
+    days_left: int
+
+class RecentActivity(BaseModel):
+    id: int
+    type: str
+    description: str
+    timestamp: datetime
 
 
 @router.get("/dashboard", response_model=DashboardStats)
@@ -797,4 +831,201 @@ def export_loan_report(
         iter([output.getvalue()]),
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment;filename={filename}"}
-    ) 
+    )
+
+
+@router.get("/dashboard/branch-performance", response_model=List[BranchPerformance])
+async def get_branch_performance(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_with_cookie)
+):
+    """Get performance metrics for each branch"""
+    query = select(Branch)
+    result = await db.execute(query)
+    branches = result.scalars().all()
+    
+    performance = []
+    for branch in branches:
+        # Get branch metrics
+        loans_query = select(func.count(Loan.id)).where(Loan.branch_id == branch.id)
+        revenue_query = select(func.sum(Payment.amount)).join(Loan).where(Loan.branch_id == branch.id)
+        items_query = select(func.count(Item.id)).where(Item.branch_id == branch.id)
+        
+        loans_count = await db.execute(loans_query)
+        revenue = await db.execute(revenue_query)
+        items_count = await db.execute(items_query)
+        
+        performance.append(BranchPerformance(
+            name=branch.name,
+            loans=loans_count.scalar() or 0,
+            revenue=float(revenue.scalar() or 0),
+            items=items_count.scalar() or 0
+        ))
+    
+    return performance
+
+@router.get("/dashboard/inventory-status", response_model=List[InventoryStatus])
+async def get_inventory_status(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_with_cookie)
+):
+    """Get inventory status breakdown"""
+    query = select(
+        Item.status,
+        func.count(Item.id).label("count")
+    ).group_by(Item.status)
+    
+    result = await db.execute(query)
+    status_counts = result.all()
+    
+    colors = {
+        "pawned": "#FFC107",
+        "redeemed": "#4CAF50",
+        "defaulted": "#F44336",
+        "for_sale": "#2196F3",
+        "sold": "#9C27B0",
+        "damaged": "#FF5722",
+        "lost": "#795548"
+    }
+    
+    return [
+        InventoryStatus(
+            name=status.value,
+            value=count,
+            color=colors.get(status.value.lower(), "#9E9E9E")
+        )
+        for status, count in status_counts
+    ]
+
+@router.get("/dashboard/recent-transactions", response_model=List[RecentTransaction])
+async def get_recent_transactions(
+    limit: int = 5,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_with_cookie)
+):
+    """Get recent transactions"""
+    query = (
+        select(Transaction)
+        .order_by(desc(Transaction.created_at))
+        .limit(limit)
+    )
+    result = await db.execute(query)
+    transactions = result.scalars().all()
+    
+    return [
+        RecentTransaction(
+            id=t.id,
+            customer=t.customer.full_name,
+            type=t.type,
+            amount=t.amount,
+            date=t.created_at,
+            status=t.status
+        )
+        for t in transactions
+    ]
+
+@router.get("/dashboard/upcoming-due-loans", response_model=List[UpcomingDueLoan])
+async def get_upcoming_due_loans(
+    days: int = 7,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_with_cookie)
+):
+    """Get loans due in the next X days"""
+    today = datetime.now()
+    due_date = today + timedelta(days=days)
+    
+    query = (
+        select(Loan)
+        .where(
+            and_(
+                Loan.due_date <= due_date,
+                Loan.status == "active"
+            )
+        )
+        .order_by(Loan.due_date)
+    )
+    
+    result = await db.execute(query)
+    loans = result.scalars().all()
+    
+    return [
+        UpcomingDueLoan(
+            id=loan.id,
+            customer=loan.customer.full_name,
+            amount=loan.amount,
+            due_date=loan.due_date,
+            days_left=(loan.due_date - today).days
+        )
+        for loan in loans
+    ]
+
+@router.get("/dashboard/recent-activity", response_model=List[RecentActivity])
+async def get_recent_activity(
+    limit: int = 10,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_with_cookie)
+):
+    """Get recent activity across the system"""
+    # Combine recent activities from different tables
+    loans_query = (
+        select(
+            Loan.id,
+            literal("loan").label("type"),
+            func.concat("New loan created for ", Customer.full_name).label("description"),
+            Loan.created_at.label("timestamp")
+        )
+        .join(Customer)
+        .order_by(desc(Loan.created_at))
+        .limit(limit)
+    )
+    
+    payments_query = (
+        select(
+            Payment.id,
+            literal("payment").label("type"),
+            func.concat("Payment received for loan #", Loan.id).label("description"),
+            Payment.created_at.label("timestamp")
+        )
+        .join(Loan)
+        .order_by(desc(Payment.created_at))
+        .limit(limit)
+    )
+    
+    items_query = (
+        select(
+            Item.id,
+            literal("inventory").label("type"),
+            func.concat("New item added to inventory: ", Item.name).label("description"),
+            Item.created_at.label("timestamp")
+        )
+        .order_by(desc(Item.created_at))
+        .limit(limit)
+    )
+    
+    # Combine and sort all activities
+    union_query = (
+        select(
+            column("id"),
+            column("type"),
+            column("description"),
+            column("timestamp")
+        )
+        .select_from(
+            loans_query.union(payments_query).union(items_query).alias()
+        )
+        .order_by(desc(column("timestamp")))
+        .limit(limit)
+    )
+    
+    result = await db.execute(union_query)
+    activities = result.all()
+    
+    return [
+        RecentActivity(
+            id=activity.id,
+            type=activity.type,
+            description=activity.description,
+            timestamp=activity.timestamp
+        )
+        for activity in activities
+    ]

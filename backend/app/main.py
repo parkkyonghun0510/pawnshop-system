@@ -9,7 +9,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.database import engine, Base, get_db
-from app.routers import users, branches, employees, customers, transactions, loans, auth, collaterals, payments, applications
+from app.routers import users, branches, employees, customers, transactions, loans, auth, collaterals, payments, applications, reports
 from app.models.users import User, Role
 from app.core.config import settings
 from app.core.security import create_access_token, verify_password, get_current_user_with_cookie
@@ -45,6 +45,7 @@ app.include_router(loans.router, prefix=f"{api_prefix}/loans", tags=["loans"])
 app.include_router(collaterals.router, prefix=f"{api_prefix}/collaterals", tags=["collaterals"])
 app.include_router(payments.router, prefix=f"{api_prefix}/payments", tags=["payments"])
 app.include_router(applications.router, prefix=f"{api_prefix}/applications", tags=["applications"])
+app.include_router(reports.router, prefix=f"{api_prefix}/dashboard", tags=["reports"])
 
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):

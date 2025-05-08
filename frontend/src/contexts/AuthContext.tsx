@@ -32,7 +32,7 @@ interface AuthContextType {
     user: User | null;
     loading: boolean;
     error: string | null;
-    login: (username: string, password: string) => Promise<void>;
+    login: (email: string, password: string) => Promise<void>;
     logout: () => void;
     isAuthenticated: boolean;
     hasPermission: (permission: string) => boolean;
@@ -69,7 +69,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Function to fetch the user profile
     const fetchUserProfile = async () => {
         try {
-            const response = await api.get('/users/me');
+            const response = await api.get('authentication/auth/me', { withCredentials: true });
             setUser(response.data);
             return true;
         } catch (err) {
@@ -86,7 +86,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     useEffect(() => {
         const checkAuth = async () => {
             const token = Cookies.get('access_token');
-            
+
             if (token) {
                 try {
                     const success = await fetchUserProfile();
@@ -106,30 +106,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 }
             }
         };
-        
+
         checkAuth();
     }, [navigate]);
 
     // Login function
-    const login = async (username: string, password: string) => {
+    const login = async (email: string, password: string) => {
         setLoading(true);
         setError(null);
-        
+
         try {
-            const formData = new URLSearchParams();
-            formData.append('username', username);
-            formData.append('password', password);
-            
-            await api.post('/auth/token', formData.toString(), {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                withCredentials: true,
-            });
-            
-            const success = await fetchUserProfile();
-            if (success) {
-                navigate('/dashboard');
+            const response = await api.post('authentication/auth/login', { email, password }, { withCredentials: true });
+            if (response.status === 200) {
+                const success = await fetchUserProfile();
+                if (success) {
+                    navigate('/dashboard');
+                }
             }
         } catch (err: any) {
             console.error('Login error:', err);
@@ -145,7 +137,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         } catch (err) {
             console.error('Logout error:', err);
         }
-        
+
         setUser(null);
         Cookies.remove('access_token', { path: '/' });
         navigate('/login');
@@ -175,4 +167,4 @@ export const useAuth = () => {
     return context;
 };
 
-export default AuthContext; 
+export default AuthContext;
