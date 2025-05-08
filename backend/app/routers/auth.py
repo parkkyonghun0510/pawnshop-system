@@ -17,7 +17,7 @@ from app.models.users import User, Role
 from app.schemas.auth import Token, Login, UserCreate, UserResponse, PasswordReset, PasswordChange
 from app.auth.permissions import ROLE_PERMISSIONS
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 def authenticate_user(db: Session, username_or_email: str, password: str) -> User:
     """Authenticates a user by username or email and password"""
@@ -123,7 +123,6 @@ def login_for_access_token(
         samesite="lax",
         secure=False,  # Set to True in production with HTTPS
     )
-    
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -226,6 +225,11 @@ def read_users_me(
     """
     Get current user
     """
+    # Ensure default values for fields that might be None
+    current_user.first_name = current_user.first_name or ""
+    current_user.last_name = current_user.last_name or ""
+    current_user.is_superuser = current_user.is_superuser if current_user.is_superuser is not None else False
+
     return current_user
 
 
@@ -250,13 +254,13 @@ async def verify_token(current_user: User = Depends(get_current_user_with_cookie
         "email": current_user.email,
         "is_active": current_user.is_active,
         "is_superuser": current_user.is_superuser,
-        "role": {
+        "roles": {
             "id": current_user.role.id,
             "name": current_user.role.name,
             "description": current_user.role.description,
             "permissions": [
                 {"value": perm} 
-                for perm in ROLE_PERMISSIONS.get(current_user.role.name.lower(), [])
+                for perm in ROLE_PERMISSIONS.get(current_user.roles.name.lower(), [])
             ]
-        } if current_user.role else None
+        } if current_user.roles else None
     }

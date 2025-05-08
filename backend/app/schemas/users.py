@@ -50,7 +50,7 @@ class UserInDBBase(UserBase):
     id: int
     username: str
     role_id: int
-    is_superuser: bool
+    is_superuser: Optional[bool] = None  # Allow None
     created_at: datetime
     updated_at: Optional[datetime] = None
 

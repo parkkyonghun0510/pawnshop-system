@@ -67,7 +67,20 @@ class Settings(BaseSettings):
     # Application settings
     LOG_LEVEL: str = "INFO"
     ENVIRONMENT: str = "development"
-    
+
+    # Additional settings to resolve validation errors
+    DEBUG: bool = False
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    ALLOWED_METHODS: str = "GET,POST,PUT,DELETE,OPTIONS"
+    ALLOW_CREDENTIALS: bool = True
+    API_PREFIX: str = "/api/v1"
+    DOCS_URL: str = "/api/docs"
+    REDOC_URL: str = "/api/redoc"
+    LOG_FILE: str = "app.log"
+    RATE_LIMIT_PER_MINUTE: int = 100
+    MAX_UPLOAD_SIZE_MB: int = 5
+    ALLOWED_UPLOAD_EXTENSIONS: str = "jpg,jpeg,png,pdf,docx"
+
     class Config:
         case_sensitive = True
         env_file = ".env"

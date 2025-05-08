@@ -35,7 +35,7 @@ app.add_middleware(
 # Include routers with API version prefix
 api_prefix = settings.API_V1_STR
 
-app.include_router(auth.router, prefix=f"{api_prefix}/auth", tags=["authentication"])
+app.include_router(auth.router, prefix="/api/v1/authentication")
 app.include_router(users.router, prefix=f"{api_prefix}/users", tags=["users"])
 app.include_router(branches.router, prefix=f"{api_prefix}/branches", tags=["branches"])
 app.include_router(employees.router, prefix=f"{api_prefix}/employees", tags=["employees"])
