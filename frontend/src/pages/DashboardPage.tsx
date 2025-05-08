@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Box,
@@ -9,12 +9,8 @@ import {
   Button,
   CircularProgress,
   Alert,
-  List,
-  ListItem,
-  ListItemText,
   Card,
   CardContent,
-  TextField,
   MenuItem,
   Select,
   FormControl,
@@ -41,8 +37,6 @@ import {
   People as PeopleIcon,
   Store as StoreIcon,
   ReceiptLong as ReceiptIcon,
-  Warning as WarningIcon,
-  TrendingUp as TrendingUpIcon,
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -200,7 +194,7 @@ export default function DashboardPage() {
   });
 
   // Fetch recent activity
-  const { data: recentActivity, isLoading: activityLoading } = useQuery<RecentActivity[]>({
+  const { /* data: recentActivity, */ isLoading: activityLoading } = useQuery<RecentActivity[]>({
     queryKey: ['recent-activity'],
     queryFn: async () => {
       const response = await apiClient.get('/dashboard/recent-activity');
@@ -435,7 +429,7 @@ export default function DashboardPage() {
                   fill="#8884d8"
                   dataKey="value"
                 >
-                  {inventoryData?.map((entry, index) => (
+                  {inventoryData?.map((entry: InventoryStatus, index: number) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
@@ -558,3 +552,5 @@ export default function DashboardPage() {
       </Grid>
     </Box>
   );
+}
+
