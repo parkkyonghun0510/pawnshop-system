@@ -14,6 +14,52 @@ import {
   FilterState
 } from '../types';
 
+// Mock data for endpoints that are not yet implemented on the backend
+// These endpoints are returning 404 errors:
+// - /api/v1/dashboard/branch-performance
+// - /api/v1/dashboard/inventory-status
+// - /api/v1/dashboard/recent-transactions
+// - /api/v1/dashboard/upcoming-due-loans
+// - /api/v1/dashboard/recent-activity
+// Using mock data until the backend endpoints are implemented
+const mockBranchPerformance: BranchPerformance[] = [
+  { name: 'Main Branch', loans: 145, revenue: 28500, items: 210 },
+  { name: 'Downtown', loans: 98, revenue: 19200, items: 156 },
+  { name: 'Westside', loans: 76, revenue: 15400, items: 120 },
+  { name: 'Eastside', loans: 62, revenue: 12800, items: 95 }
+];
+
+const mockInventoryStatus: InventoryStatus[] = [
+  { name: 'PAWNED', value: 120, color: '#FFC107' },
+  { name: 'AVAILABLE', value: 85, color: '#2196F3' },
+  { name: 'SOLD', value: 45, color: '#9C27B0' },
+  { name: 'EXPIRED', value: 15, color: '#F44336' }
+];
+
+const mockRecentTransactions: RecentTransaction[] = [
+  { id: 1, customer: 'John Smith', type: 'Loan', amount: 500, date: dayjs().subtract(1, 'day').toISOString(), status: 'Completed' },
+  { id: 2, customer: 'Maria Garcia', type: 'Payment', amount: 350, date: dayjs().subtract(2, 'day').toISOString(), status: 'Completed' },
+  { id: 3, customer: 'Robert Johnson', type: 'Sale', amount: 750, date: dayjs().subtract(3, 'day').toISOString(), status: 'Completed' },
+  { id: 4, customer: 'Sarah Williams', type: 'Loan', amount: 1200, date: dayjs().subtract(4, 'day').toISOString(), status: 'Pending' },
+  { id: 5, customer: 'David Brown', type: 'Payment', amount: 420, date: dayjs().subtract(5, 'day').toISOString(), status: 'Completed' }
+];
+
+const mockUpcomingDueLoans: UpcomingDueLoan[] = [
+  { id: 1, customer: 'James Wilson', amount: 850, dueDate: dayjs().add(1, 'day').toISOString(), daysLeft: 1 },
+  { id: 2, customer: 'Patricia Moore', amount: 1200, dueDate: dayjs().add(2, 'day').toISOString(), daysLeft: 2 },
+  { id: 3, customer: 'Michael Taylor', amount: 650, dueDate: dayjs().add(3, 'day').toISOString(), daysLeft: 3 },
+  { id: 4, customer: 'Linda Anderson', amount: 900, dueDate: dayjs().add(5, 'day').toISOString(), daysLeft: 5 },
+  { id: 5, customer: 'Robert Thomas', amount: 1500, dueDate: dayjs().add(7, 'day').toISOString(), daysLeft: 7 }
+];
+
+const mockRecentActivity: RecentActivity[] = [
+  { id: 1, type: 'loan', description: 'New loan created for John Smith', timestamp: dayjs().subtract(2, 'hour').toISOString() },
+  { id: 2, type: 'payment', description: 'Payment received from Maria Garcia', timestamp: dayjs().subtract(5, 'hour').toISOString() },
+  { id: 3, type: 'sale', description: 'Item sold to Robert Johnson', timestamp: dayjs().subtract(1, 'day').toISOString() },
+  { id: 4, type: 'inventory', description: 'New item added to inventory', timestamp: dayjs().subtract(2, 'day').toISOString() },
+  { id: 5, type: 'customer', description: 'New customer Sarah Williams registered', timestamp: dayjs().subtract(3, 'day').toISOString() }
+];
+
 export const useDashboardData = (filters: FilterState): DashboardDataHookResult => {
   const { dateRange, branchFilter } = filters;
   const queryClient = useQueryClient();
@@ -60,60 +106,56 @@ export const useDashboardData = (filters: FilterState): DashboardDataHookResult 
     refetchInterval: isConnected ? false : 30000, // Only poll if WebSocket is not connected
   });
 
-  // Fetch branch performance
+  // Use mock data for branch performance instead of API call
   const { data: branchPerformance, isLoading: branchLoading } = useQuery<BranchPerformance[]>({
     queryKey: ['branch-performance', branchFilter],
     queryFn: async () => {
-      const response = await apiClient.get('/dashboard/branch-performance', {
-        params: { branch_id: branchFilter !== 'all' ? branchFilter : undefined }
-      });
-      return response.data;
+      // Return mock data instead of making API call
+      return mockBranchPerformance;
     },
     enabled: !isConnected,
     refetchInterval: isConnected ? false : 30000,
   });
 
-  // Fetch inventory status
+  // Use mock data for inventory status instead of API call
   const { data: inventoryStatus, isLoading: inventoryLoading } = useQuery<InventoryStatus[]>({
     queryKey: ['inventory-status', branchFilter],
     queryFn: async () => {
-      const response = await apiClient.get('/dashboard/inventory-status', {
-        params: { branch_id: branchFilter !== 'all' ? branchFilter : undefined }
-      });
-      return response.data;
+      // Return mock data instead of making API call
+      return mockInventoryStatus;
     },
     enabled: !isConnected,
     refetchInterval: isConnected ? false : 30000,
   });
 
-  // Fetch recent transactions
+  // Use mock data for recent transactions instead of API call
   const { data: recentTransactions, isLoading: transactionsLoading } = useQuery<RecentTransaction[]>({
     queryKey: ['recent-transactions'],
     queryFn: async () => {
-      const response = await apiClient.get('/dashboard/recent-transactions');
-      return response.data;
+      // Return mock data instead of making API call
+      return mockRecentTransactions;
     },
     enabled: !isConnected,
     refetchInterval: isConnected ? false : 30000,
   });
 
-  // Fetch upcoming due loans
+  // Use mock data for upcoming due loans instead of API call
   const { data: upcomingDueLoans, isLoading: loansLoading } = useQuery<UpcomingDueLoan[]>({
     queryKey: ['upcoming-due-loans'],
     queryFn: async () => {
-      const response = await apiClient.get('/dashboard/upcoming-due-loans');
-      return response.data;
+      // Return mock data instead of making API call
+      return mockUpcomingDueLoans;
     },
     enabled: !isConnected,
     refetchInterval: isConnected ? false : 30000,
   });
 
-  // Fetch recent activity
+  // Use mock data for recent activity instead of API call
   const { data: recentActivity, isLoading: activityLoading } = useQuery<RecentActivity[]>({
     queryKey: ['recent-activity'],
     queryFn: async () => {
-      const response = await apiClient.get('/dashboard/recent-activity');
-      return response.data;
+      // Return mock data instead of making API call
+      return mockRecentActivity;
     },
     enabled: !isConnected,
     refetchInterval: isConnected ? false : 30000,

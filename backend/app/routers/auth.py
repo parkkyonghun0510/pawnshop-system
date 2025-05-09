@@ -247,6 +247,7 @@ def read_users_me(
     current_user.first_name = current_user.first_name or ""
     current_user.last_name = current_user.last_name or ""
     current_user.is_superuser = current_user.is_superuser if current_user.is_superuser is not None else False
+    # role_id can be None
 
     # Convert role to dictionary if it exists
     role_dict = None

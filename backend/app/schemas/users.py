@@ -49,7 +49,7 @@ class UserInDBBase(UserBase):
     """Base schema for users in DB"""
     id: int
     username: str
-    role_id: int
+    role_id: Optional[int] = None
     is_superuser: Optional[bool] = None  # Allow None
     created_at: datetime
     updated_at: Optional[datetime] = None

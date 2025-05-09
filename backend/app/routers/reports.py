@@ -74,6 +74,14 @@ class CustomerReport(BaseModel):
     customer_acquisition_by_date: List[Dict[str, Union[str, int]]]
 
 
+class RevenueDayData(BaseModel):
+    date: str
+    value: float
+
+class LoanApplicationDayData(BaseModel):
+    date: str
+    count: int
+
 class DashboardStats(BaseModel):
     """Schema for dashboard statistics"""
     total_loans: int
@@ -87,8 +95,8 @@ class DashboardStats(BaseModel):
     new_customers_this_month: int
     overdue_loans: int
     defaulted_loans: int
-    revenue_by_day: List[Dict[str, Union[str, float]]]
-    loan_applications_by_day: List[Dict[str, Union[str, int]]]
+    revenue_by_day: List[RevenueDayData]
+    loan_applications_by_day: List[LoanApplicationDayData]
 
 
 class BranchPerformance(BaseModel):
@@ -114,8 +122,8 @@ class UpcomingDueLoan(BaseModel):
     id: int
     customer: str
     amount: float
-    due_date: datetime
-    days_left: int
+    dueDate: datetime
+    daysLeft: int
 
 class RecentActivity(BaseModel):
     id: int
@@ -135,77 +143,77 @@ def get_dashboard_stats(
     """
     today = date.today()
     start_date = today - timedelta(days=days)
-    
+
     # Get loan statistics
     loans_query = db.query(Loan)
     total_loans = loans_query.count()
     active_loans = loans_query.filter(Loan.status == LoanStatusEnum.ACTIVE).count()
     overdue_loans = loans_query.filter(Loan.status == LoanStatusEnum.OVERDUE).count()
     defaulted_loans = loans_query.filter(Loan.status == LoanStatusEnum.DEFAULTED).count()
-    
+
     # Financial metrics
-    total_loan_amount = db.query(func.sum(Loan.loan_amount)).scalar() or 0
-    
+    total_loan_amount = db.query(func.sum(Loan.principal_amount)).scalar() or 0
+
     # Calculate interest earned from payments
     payments_sum = db.query(func.sum(Payment.amount)).scalar() or 0
     total_interest_earned = payments_sum - total_loan_amount if payments_sum > total_loan_amount else 0
-    
+
     # Sales statistics
     sales_query = db.query(Transaction).filter(Transaction.transaction_type == TransactionType.SALE)
     total_sales = db.query(func.sum(Transaction.amount)).filter(
         Transaction.transaction_type == TransactionType.SALE
     ).scalar() or 0
-    
+
     # Sales today
     sales_today = db.query(func.sum(Transaction.amount)).filter(
         Transaction.transaction_type == TransactionType.SALE,
         func.date(Transaction.transaction_date) == today
     ).scalar() or 0
-    
+
     # Inventory value
-    total_inventory_value = db.query(func.sum(Item.appraisal_value)).filter(
-        Item.status.in_([ItemStatus.IN_INVENTORY, ItemStatus.FOR_SALE])
+    total_inventory_value = db.query(func.sum(Item.appraised_value)).filter(
+        Item.status.in_(['PAWNED', 'AVAILABLE'])
     ).scalar() or 0
-    
+
     # Customer statistics
     customers_query = db.query(Customer)
     total_customers = customers_query.count()
-    
+
     # New customers this month
     new_customers_this_month = customers_query.filter(
         extract('year', Customer.created_at) == today.year,
         extract('month', Customer.created_at) == today.month
     ).count()
-    
+
     # Daily revenue chart data
     revenue_by_day = []
     loan_applications_by_day = []
-    
+
     for i in range(days):
         current_date = today - timedelta(days=days - i - 1)
         next_date = current_date + timedelta(days=1)
-        
+
         # Revenue for the day
         daily_revenue = db.query(func.sum(Transaction.amount)).filter(
             Transaction.transaction_date >= current_date,
             Transaction.transaction_date < next_date
         ).scalar() or 0
-        
+
         revenue_by_day.append({
             "date": current_date.isoformat(),
             "value": float(daily_revenue)
         })
-        
+
         # Loan applications for the day
         daily_loans = db.query(func.count(Loan.id)).filter(
             func.date(Loan.created_at) == current_date
         ).scalar() or 0
-        
+
         loan_applications_by_day.append({
             "date": current_date.isoformat(),
             "count": daily_loans
         })
-    
+
     return {
         "total_loans": total_loans,
         "active_loans": active_loans,
@@ -239,23 +247,23 @@ def get_sales_report(
         end_date = date.today()
     if not start_date:
         start_date = end_date - timedelta(days=30)
-    
+
     # Base query for sales transactions
     query = db.query(Transaction).filter(
         Transaction.transaction_type == TransactionType.SALE,
         func.date(Transaction.transaction_date) >= start_date,
         func.date(Transaction.transaction_date) <= end_date
     )
-    
+
     # Apply branch filter if provided
     if branch_id:
         query = query.filter(Transaction.branch_id == branch_id)
-    
+
     # Total sales and transactions
     total_sales = db.query(func.sum(Transaction.amount)).filter(query.whereclause).scalar() or 0
     total_transactions = query.count()
     average_sale_value = total_sales / total_transactions if total_transactions > 0 else 0
-    
+
     # Sales by date
     sales_by_date_query = db.query(
         func.date(Transaction.transaction_date).label("date"),
@@ -266,7 +274,7 @@ def get_sales_report(
     ).order_by(
         func.date(Transaction.transaction_date)
     ).all()
-    
+
     sales_by_date = [
         {
             "date": date.isoformat(),
@@ -275,7 +283,7 @@ def get_sales_report(
         }
         for date, amount, count in sales_by_date_query
     ]
-    
+
     # Sales by payment method
     sales_by_payment_method = {
         "cash": 0.0,
@@ -286,7 +294,7 @@ def get_sales_report(
         "check": 0.0,
         "other": 0.0
     }
-    
+
     # We can still get transaction totals by branch
     sales_by_branch_query = db.query(
         Branch.name,
@@ -296,12 +304,12 @@ def get_sales_report(
     ).filter(query.whereclause).group_by(
         Branch.name
     ).all()
-    
+
     sales_by_branch = {
         branch_name: float(amount)
         for branch_name, amount in sales_by_branch_query
     }
-    
+
     # Top selling items
     top_selling_items_query = db.query(
         Item.name,
@@ -315,7 +323,7 @@ def get_sales_report(
     ).order_by(
         func.count(Transaction.id).desc()
     ).limit(10).all()
-    
+
     top_selling_items = [
         {
             "name": name,
@@ -325,7 +333,7 @@ def get_sales_report(
         }
         for name, category, transaction_count, total_amount in top_selling_items_query
     ]
-    
+
     return {
         "total_sales": total_sales,
         "total_transactions": total_transactions,
@@ -353,47 +361,47 @@ def get_loan_report(
         end_date = date.today()
     if not start_date:
         start_date = end_date - timedelta(days=30)
-    
+
     # Base query for loans
     query = db.query(Loan).filter(
         func.date(Loan.created_at) >= start_date,
         func.date(Loan.created_at) <= end_date
     )
-    
+
     # Apply branch filter if provided
     if branch_id:
         query = query.filter(Loan.branch_id == branch_id)
-    
+
     # Total loans
     total_loans = query.count()
-    total_loan_amount = db.query(func.sum(Loan.loan_amount)).filter(query.whereclause).scalar() or 0
-    
+    total_loan_amount = db.query(func.sum(Loan.principal_amount)).filter(query.whereclause).scalar() or 0
+
     # Loans by status
     active_loans = query.filter(Loan.status == LoanStatusEnum.ACTIVE).count()
     overdue_loans = query.filter(Loan.status == LoanStatusEnum.OVERDUE).count()
     completed_loans = query.filter(Loan.status == LoanStatusEnum.COMPLETED).count()
     defaulted_loans = query.filter(Loan.status == LoanStatusEnum.DEFAULTED).count()
-    
+
     # Calculate interest collected
     # This is an approximation - in a real system, you'd track interest vs principal
     total_interest_collected = db.query(func.sum(Payment.amount)).join(
         Loan, Payment.loan_id == Loan.id
     ).filter(query.whereclause).scalar() or 0
-    
+
     # Adjust interest (subtract principal)
     total_interest_collected = max(0, total_interest_collected - total_loan_amount)
-    
+
     # Loans by date
     loans_by_date_query = db.query(
         func.date(Loan.created_at).label("date"),
-        func.sum(Loan.loan_amount).label("amount"),
+        func.sum(Loan.principal_amount).label("amount"),
         func.count(Loan.id).label("count")
     ).filter(query.whereclause).group_by(
         func.date(Loan.created_at)
     ).order_by(
         func.date(Loan.created_at)
     ).all()
-    
+
     loans_by_date = [
         {
             "date": date.isoformat(),
@@ -402,26 +410,26 @@ def get_loan_report(
         }
         for date, amount, count in loans_by_date_query
     ]
-    
+
     # Loans by branch
     loans_by_branch_query = db.query(
         Branch.name,
-        func.sum(Loan.loan_amount).label("amount")
+        func.sum(Loan.principal_amount).label("amount")
     ).join(
         Branch, Loan.branch_id == Branch.id
     ).filter(query.whereclause).group_by(
         Branch.name
     ).all()
-    
+
     loans_by_branch = {
         branch_name: float(amount)
         for branch_name, amount in loans_by_branch_query
     }
-    
+
     # Average metrics
     average_loan_amount = total_loan_amount / total_loans if total_loans > 0 else 0
     average_loan_duration = db.query(func.avg(Loan.term_days)).filter(query.whereclause).scalar() or 0
-    
+
     return {
         "total_loans": total_loans,
         "total_loan_amount": total_loan_amount,
@@ -448,21 +456,22 @@ def get_inventory_report(
     """
     # Base query for inventory
     query = db.query(Item)
-    
+
     # Apply branch filter if provided
     if branch_id:
         query = query.filter(Item.branch_id == branch_id)
-    
+
     # Total items and value
     total_items = query.count()
-    total_inventory_value = db.query(func.sum(Item.appraisal_value)).filter(query.whereclause).scalar() or 0
-    
+    total_inventory_value = db.query(func.sum(Item.appraised_value)).filter(query.whereclause).scalar() or 0
+
     # Items by status
     items_by_status = {}
-    for status in ItemStatus:
-        count = query.filter(Item.status == status.value).count()
-        items_by_status[status.value] = count
-    
+    # Use the actual values from the database enum
+    for status in ['AVAILABLE', 'PAWNED', 'SOLD', 'EXPIRED']:
+        count = query.filter(Item.status == status).count()
+        items_by_status[status] = count
+
     # Items by category
     items_by_category_query = db.query(
         Item.category,
@@ -470,12 +479,12 @@ def get_inventory_report(
     ).filter(query.whereclause).group_by(
         Item.category
     ).all()
-    
+
     items_by_category = {
         category: count
         for category, count in items_by_category_query
     }
-    
+
     # Items by branch
     items_by_branch_query = db.query(
         Branch.name,
@@ -485,41 +494,41 @@ def get_inventory_report(
     ).filter(query.whereclause).group_by(
         Branch.name
     ).all()
-    
+
     items_by_branch = {
         branch_name: count
         for branch_name, count in items_by_branch_query
     }
-    
+
     # Recently acquired items
     recently_acquired_items_query = query.order_by(desc(Item.created_at)).limit(10).all()
-    
+
     recently_acquired_items = [
         {
             "id": item.id,
             "name": item.name,
             "category": item.category,
             "status": item.status,
-            "appraisal_value": item.appraisal_value,
+            "appraisal_value": item.appraised_value,
             "created_at": item.created_at
         }
         for item in recently_acquired_items_query
     ]
-    
+
     # Highest value items
-    highest_value_items_query = query.order_by(desc(Item.appraisal_value)).limit(10).all()
-    
+    highest_value_items_query = query.order_by(desc(Item.appraised_value)).limit(10).all()
+
     highest_value_items = [
         {
             "id": item.id,
             "name": item.name,
             "category": item.category,
             "status": item.status,
-            "appraisal_value": item.appraisal_value
+            "appraisal_value": item.appraised_value
         }
         for item in highest_value_items_query
     ]
-    
+
     return {
         "total_items": total_items,
         "total_inventory_value": total_inventory_value,
@@ -542,30 +551,30 @@ def get_customer_report(
     """
     # Current date
     today = date.today()
-    
+
     # Base query for customers
     query = db.query(Customer)
-    
+
     # Apply branch filter if provided (using most frequent branch from loans)
     if branch_id:
         # This is a simplification - in a real system, you might store preferred branch with customer
         customer_ids = db.query(Loan.customer_id).filter(
             Loan.branch_id == branch_id
         ).distinct().subquery()
-        
+
         query = query.filter(Customer.id.in_(customer_ids))
-    
+
     # Total customers
     total_customers = query.count()
-    
+
     # Active/inactive customers
     active_customers = query.filter(Customer.is_active == True).count()
     inactive_customers = query.filter(Customer.is_active == False).count()
-    
+
     # New customers (last 30 days)
     thirty_days_ago = today - timedelta(days=30)
     new_customers = query.filter(Customer.created_at >= thirty_days_ago).count()
-    
+
     # Customers by branch (based on their loans)
     customers_by_branch_query = db.query(
         Branch.name,
@@ -575,12 +584,12 @@ def get_customer_report(
     ).group_by(
         Branch.name
     ).all()
-    
+
     customers_by_branch = {
         branch_name: count
         for branch_name, count in customers_by_branch_query
     }
-    
+
     # Top customers by loan amount
     top_customers_query = db.query(
         Customer.id,
@@ -589,15 +598,15 @@ def get_customer_report(
         Customer.email,
         Customer.phone,
         func.count(Loan.id).label("loan_count"),
-        func.sum(Loan.loan_amount).label("total_loan_amount")
+        func.sum(Loan.principal_amount).label("total_loan_amount")
     ).join(
         Loan, Loan.customer_id == Customer.id
     ).group_by(
         Customer.id, Customer.first_name, Customer.last_name, Customer.email, Customer.phone
     ).order_by(
-        func.sum(Loan.loan_amount).desc()
+        func.sum(Loan.principal_amount).desc()
     ).limit(10).all()
-    
+
     top_customers = [
         {
             "id": id,
@@ -609,7 +618,7 @@ def get_customer_report(
         }
         for id, first_name, last_name, email, phone, loan_count, total_loan_amount in top_customers_query
     ]
-    
+
     # Customer acquisition by month
     acquisition_by_date_query = db.query(
         extract('year', Customer.created_at).label("year"),
@@ -624,7 +633,7 @@ def get_customer_report(
         extract('year', Customer.created_at),
         extract('month', Customer.created_at)
     ).all()
-    
+
     customer_acquisition_by_date = [
         {
             "date": f"{int(year)}-{int(month):02d}",
@@ -632,7 +641,7 @@ def get_customer_report(
         }
         for year, month, count in acquisition_by_date_query
     ]
-    
+
     return {
         "total_customers": total_customers,
         "active_customers": active_customers,
@@ -660,7 +669,7 @@ def export_sales_report(
         end_date = date.today()
     if not start_date:
         start_date = end_date - timedelta(days=30)
-    
+
     # Query for sales transactions with details
     query = db.query(
         Transaction.id,
@@ -683,33 +692,33 @@ def export_sales_report(
         func.date(Transaction.transaction_date) >= start_date,
         func.date(Transaction.transaction_date) <= end_date
     )
-    
+
     # Apply branch filter if provided
     if branch_id:
         query = query.filter(Transaction.branch_id == branch_id)
-    
+
     # Order by date
     query = query.order_by(Transaction.transaction_date)
-    
+
     # Execute query
     sales_data = query.all()
-    
+
     # Create CSV
     output = StringIO()
     writer = csv.writer(output)
-    
+
     # Write header
     writer.writerow([
-        "Transaction ID", 
-        "Transaction Number", 
-        "Date", 
-        "Amount", 
-        "Branch", 
+        "Transaction ID",
+        "Transaction Number",
+        "Date",
+        "Amount",
+        "Branch",
         "Customer",
         "Item",
         "Category"
     ])
-    
+
     # Write data
     for row in sales_data:
         writer.writerow([
@@ -722,10 +731,10 @@ def export_sales_report(
             row.item_name if row.item_name else "N/A",
             row.item_category if row.item_category else "N/A"
         ])
-    
+
     # Return CSV as streaming response
     output.seek(0)
-    
+
     filename = f"sales_report_{start_date}_{end_date}.csv"
     return StreamingResponse(
         iter([output.getvalue()]),
@@ -750,7 +759,7 @@ def export_loan_report(
         end_date = date.today()
     if not start_date:
         start_date = end_date - timedelta(days=30)
-    
+
     # Query for loans with details
     query = db.query(
         Loan.id,
@@ -758,7 +767,7 @@ def export_loan_report(
         func.date(Loan.created_at).label("created_date"),
         Loan.start_date,
         Loan.due_date,
-        Loan.loan_amount,
+        Loan.principal_amount,
         Loan.interest_rate,
         Loan.status,
         Branch.name.label("branch_name"),
@@ -776,37 +785,37 @@ def export_loan_report(
         func.date(Loan.created_at) >= start_date,
         func.date(Loan.created_at) <= end_date
     )
-    
+
     # Apply branch filter if provided
     if branch_id:
         query = query.filter(Loan.branch_id == branch_id)
-    
+
     # Order by date
     query = query.order_by(Loan.created_at)
-    
+
     # Execute query
     loan_data = query.all()
-    
+
     # Create CSV
     output = StringIO()
     writer = csv.writer(output)
-    
+
     # Write header
     writer.writerow([
-        "Loan ID", 
-        "Loan Code", 
-        "Created Date", 
-        "Start Date", 
-        "Due Date", 
-        "Loan Amount", 
-        "Interest Rate (%)", 
-        "Status", 
-        "Branch", 
+        "Loan ID",
+        "Loan Code",
+        "Created Date",
+        "Start Date",
+        "Due Date",
+        "Loan Amount",
+        "Interest Rate (%)",
+        "Status",
+        "Branch",
         "Customer",
         "Item",
         "Category"
     ])
-    
+
     # Write data
     for row in loan_data:
         writer.writerow([
@@ -815,7 +824,7 @@ def export_loan_report(
             row.created_date.isoformat(),
             row.start_date.isoformat(),
             row.due_date.isoformat(),
-            row.loan_amount,
+            row.principal_amount,
             row.interest_rate,
             row.status,
             row.branch_name,
@@ -823,10 +832,10 @@ def export_loan_report(
             row.item_name,
             row.item_category
         ])
-    
+
     # Return CSV as streaming response
     output.seek(0)
-    
+
     filename = f"loan_report_{start_date}_{end_date}.csv"
     return StreamingResponse(
         iter([output.getvalue()]),
@@ -844,25 +853,25 @@ async def get_branch_performance(
     query = select(Branch)
     result = await db.execute(query)
     branches = result.scalars().all()
-    
+
     performance = []
     for branch in branches:
         # Get branch metrics
         loans_query = select(func.count(Loan.id)).where(Loan.branch_id == branch.id)
         revenue_query = select(func.sum(Payment.amount)).join(Loan).where(Loan.branch_id == branch.id)
         items_query = select(func.count(Item.id)).where(Item.branch_id == branch.id)
-        
+
         loans_count = await db.execute(loans_query)
         revenue = await db.execute(revenue_query)
         items_count = await db.execute(items_query)
-        
+
         performance.append(BranchPerformance(
             name=branch.name,
             loans=loans_count.scalar() or 0,
             revenue=float(revenue.scalar() or 0),
             items=items_count.scalar() or 0
         ))
-    
+
     return performance
 
 @router.get("/dashboard/inventory-status", response_model=List[InventoryStatus])
@@ -875,25 +884,22 @@ async def get_inventory_status(
         Item.status,
         func.count(Item.id).label("count")
     ).group_by(Item.status)
-    
+
     result = await db.execute(query)
     status_counts = result.all()
-    
+
     colors = {
-        "pawned": "#FFC107",
-        "redeemed": "#4CAF50",
-        "defaulted": "#F44336",
-        "for_sale": "#2196F3",
-        "sold": "#9C27B0",
-        "damaged": "#FF5722",
-        "lost": "#795548"
+        "PAWNED": "#FFC107",
+        "AVAILABLE": "#2196F3",
+        "SOLD": "#9C27B0",
+        "EXPIRED": "#F44336"
     }
-    
+
     return [
         InventoryStatus(
-            name=status.value,
+            name=status,
             value=count,
-            color=colors.get(status.value.lower(), "#9E9E9E")
+            color=colors.get(status, "#9E9E9E")
         )
         for status, count in status_counts
     ]
@@ -912,7 +918,7 @@ async def get_recent_transactions(
     )
     result = await db.execute(query)
     transactions = result.scalars().all()
-    
+
     return [
         RecentTransaction(
             id=t.id,
@@ -934,28 +940,28 @@ async def get_upcoming_due_loans(
     """Get loans due in the next X days"""
     today = datetime.now()
     due_date = today + timedelta(days=days)
-    
+
     query = (
         select(Loan)
         .where(
             and_(
                 Loan.due_date <= due_date,
-                Loan.status == "active"
+                Loan.status == LoanStatusEnum.ACTIVE.value
             )
         )
         .order_by(Loan.due_date)
     )
-    
+
     result = await db.execute(query)
     loans = result.scalars().all()
-    
+
     return [
         UpcomingDueLoan(
             id=loan.id,
             customer=loan.customer.full_name,
-            amount=loan.amount,
-            due_date=loan.due_date,
-            days_left=(loan.due_date - today).days
+            amount=loan.principal_amount,
+            dueDate=loan.due_date,
+            daysLeft=(loan.due_date - today).days
         )
         for loan in loans
     ]
@@ -979,7 +985,7 @@ async def get_recent_activity(
         .order_by(desc(Loan.created_at))
         .limit(limit)
     )
-    
+
     payments_query = (
         select(
             Payment.id,
@@ -991,7 +997,7 @@ async def get_recent_activity(
         .order_by(desc(Payment.created_at))
         .limit(limit)
     )
-    
+
     items_query = (
         select(
             Item.id,
@@ -1002,7 +1008,7 @@ async def get_recent_activity(
         .order_by(desc(Item.created_at))
         .limit(limit)
     )
-    
+
     # Combine and sort all activities
     union_query = (
         select(
@@ -1017,10 +1023,10 @@ async def get_recent_activity(
         .order_by(desc(column("timestamp")))
         .limit(limit)
     )
-    
+
     result = await db.execute(union_query)
     activities = result.all()
-    
+
     return [
         RecentActivity(
             id=activity.id,

@@ -38,7 +38,7 @@ class UserResponse(BaseModel):
     last_name: str
     is_active: bool
     is_superuser: bool
-    role_id: int
+    role_id: Optional[int] = None
     role: Optional[dict] = None
 
     model_config = ConfigDict(from_attributes=True)
