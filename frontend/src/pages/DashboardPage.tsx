@@ -133,7 +133,7 @@ export default function DashboardPage() {
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats', dateRange[0].format('YYYY-MM-DD'), dateRange[1].format('YYYY-MM-DD')],
     queryFn: async () => {
-      const response = await apiClient.get('/dashboard', {
+      const response = await apiClient.get('/dashboard/stats', {
         params: {
           start_date: dateRange[0].format('YYYY-MM-DD'),
           end_date: dateRange[1].format('YYYY-MM-DD')

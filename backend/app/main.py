@@ -6,9 +6,9 @@ from fastapi import FastAPI, Request, status, Depends, Response, HTTPException, 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import engine, Base, get_db
+from app.database import Base, engine, get_async_db
 from app.routers import users, branches, employees, customers, transactions, loans, auth, collaterals, payments, applications, reports
 from app.models.users import User, Role
 from app.core.config import settings
@@ -29,21 +29,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=[
-        "Content-Type",
-        "Authorization",
-        "Accept",
-        "Accept-Language",
-        "Content-Language",
-        "Origin",
-        "X-Requested-With",
-        "X-CSRF-Token",
-        "X-Content-Type-Options",
-        "X-Frame-Options",
-        "X-XSS-Protection"
-    ],
-    expose_headers=["Content-Type", "Authorization", "Set-Cookie"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["Content-Type", "Authorization", "Set-Cookie", "Access-Control-Allow-Origin"],
     max_age=600  # Cache preflight requests for 10 minutes
 )
 
@@ -96,7 +84,7 @@ async def root():
 async def login_for_access_token(
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """Endpoint for OAuth2 compatible login"""
     # Try to authenticate with username or email

@@ -4,9 +4,9 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Body, status
 from sqlalchemy import or_, and_, func, extract, desc
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
+from app.database import get_async_db
 from app.models.operations import Item, ItemStatus, ItemCategory, Customer, Loan
 from app.models.users import User
 from app.models.organization import Branch
@@ -31,8 +31,8 @@ def generate_item_code() -> str:
 
 
 @router.get("/", response_model=List[ItemSchema])
-def read_items(
-    db: Session = Depends(get_db),
+async def read_items(
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie),
     skip: int = 0,
     limit: int = 100,
@@ -43,7 +43,7 @@ def read_items(
     """
     Retrieve items with optional filtering.
     """
-    query = db.query(Item)
+    query = select(Item)
     
     # Apply filters
     if status:
@@ -64,15 +64,18 @@ def read_items(
         )
     
     # Apply pagination
-    items = query.order_by(Item.created_at.desc()).offset(skip).limit(limit).all()
+    query = query.order_by(Item.created_at.desc()).offset(skip).limit(limit)
+    
+    items = await db.execute(query)
+    items = items.scalars().all()
     
     return items
 
 
 @router.post("/", response_model=ItemSchema)
-def create_item(
+async def create_item(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     item_in: ItemCreate,
     current_user: User = Depends(get_current_user_with_cookie)
 ) -> Any:
@@ -81,7 +84,9 @@ def create_item(
     """
     # Check if customer exists if specified
     if item_in.customer_id:
-        customer = db.query(Customer).filter(Customer.id == item_in.customer_id).first()
+        query = select(Customer).filter(Customer.id == item_in.customer_id)
+        customer = await db.execute(query)
+        customer = customer.scalars().first()
         if not customer:
             raise HTTPException(
                 status_code=404,
@@ -90,7 +95,9 @@ def create_item(
     
     # Check if branch exists if specified
     if item_in.branch_id:
-        branch = db.query(Branch).filter(Branch.id == item_in.branch_id).first()
+        query = select(Branch).filter(Branch.id == item_in.branch_id)
+        branch = await db.execute(query)
+        branch = branch.scalars().first()
         if not branch:
             raise HTTPException(
                 status_code=404,
@@ -119,8 +126,8 @@ def create_item(
     )
     
     db.add(db_item)
-    db.commit()
-    db.refresh(db_item)
+    await db.commit()
+    await db.refresh(db_item)
     
     # TODO: Handle attributes and photos if needed
     
@@ -128,16 +135,18 @@ def create_item(
 
 
 @router.get("/{item_id}", response_model=ItemSchema)
-def read_item(
+async def read_item(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     item_id: int = Path(..., gt=0),
     current_user: User = Depends(get_current_user_with_cookie)
 ) -> Any:
     """
     Get item by ID.
     """
-    item = db.query(Item).filter(Item.id == item_id).first()
+    query = select(Item).filter(Item.id == item_id)
+    item = await db.execute(query)
+    item = item.scalars().first()
     
     if not item:
         raise HTTPException(
@@ -149,9 +158,9 @@ def read_item(
 
 
 @router.put("/{item_id}", response_model=ItemSchema)
-def update_item(
+async def update_item(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     item_id: int = Path(..., gt=0),
     item_in: ItemUpdate,
     current_user: User = Depends(get_current_user_with_cookie)
@@ -159,7 +168,9 @@ def update_item(
     """
     Update an item.
     """
-    item = db.query(Item).filter(Item.id == item_id).first()
+    query = select(Item).filter(Item.id == item_id)
+    item = await db.execute(query)
+    item = item.scalars().first()
     
     if not item:
         raise HTTPException(
@@ -169,7 +180,9 @@ def update_item(
     
     # Check if customer exists if being updated
     if item_in.customer_id:
-        customer = db.query(Customer).filter(Customer.id == item_in.customer_id).first()
+        query = select(Customer).filter(Customer.id == item_in.customer_id)
+        customer = await db.execute(query)
+        customer = customer.scalars().first()
         if not customer:
             raise HTTPException(
                 status_code=404,
@@ -178,7 +191,9 @@ def update_item(
     
     # Check if branch exists if being updated
     if item_in.branch_id:
-        branch = db.query(Branch).filter(Branch.id == item_in.branch_id).first()
+        query = select(Branch).filter(Branch.id == item_in.branch_id)
+        branch = await db.execute(query)
+        branch = branch.scalars().first()
         if not branch:
             raise HTTPException(
                 status_code=404,
@@ -194,16 +209,16 @@ def update_item(
     item.updated_at = datetime.utcnow()
     
     db.add(item)
-    db.commit()
-    db.refresh(item)
+    await db.commit()
+    await db.refresh(item)
     
     return item
 
 
 @router.delete("/{item_id}", response_model=ItemSchema)
-def delete_item(
+async def delete_item(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     item_id: int = Path(..., gt=0),
     current_user: User = Depends(get_current_user_with_cookie)
 ) -> Any:

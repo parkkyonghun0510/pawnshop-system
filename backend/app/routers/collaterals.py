@@ -1,8 +1,8 @@
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
+from app.database import get_async_db
 from app.models.users import User
 from app.models.operations import Item, Loan
 from app.schemas.loans import Loan as LoanSchema
@@ -46,13 +46,14 @@ router = APIRouter(
         }
     }
 )
-def get_loan_collateral(
+async def read_collateral_by_id(
     loan_id: int = Path(..., gt=0, description="The ID of the loan to get collateral details for"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ) -> Any:
     """Get collateral details for a loan."""
-    loan = db.query(Loan).filter(Loan.id == loan_id).first()
+    result = await db.execute(select(Loan).filter(Loan.id == loan_id))
+    loan = result.scalars().first()
     if not loan:
         raise HTTPException(status_code=404, detail="Loan not found")
     return loan
@@ -68,13 +69,14 @@ def get_loan_collateral(
         }
     }
 )
-def get_item_collateral(
+async def read_collateral_by_item(
     item_id: int = Path(..., gt=0, description="The ID of the item to get loan details for"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ) -> Any:
     """Get loan details for a collateral item."""
-    loan = db.query(Loan).filter(Loan.item_id == item_id).first()
+    result = await db.execute(select(Loan).filter(Loan.item_id == item_id))
+    loan = result.scalars().first()
     if not loan:
         raise HTTPException(status_code=404, detail="No loan found for this item")
     return loan 

@@ -1,8 +1,8 @@
 from typing import List, Optional, Dict, Union
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Body, Response, Path
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import desc, and_, or_, func, extract
-from app.database import get_db
+from app.database import get_async_db
 from app.models.operations import Application, ApplicationStatus
 from app.schemas.operations import ApplicationCreate, ApplicationUpdate, Application as ApplicationSchema
 from app.core.security import get_current_user_with_cookie
@@ -111,11 +111,11 @@ async def get_applications(
     search: Optional[str] = Query(None, description="Search in application number, description, and notes"),
     sort_by: str = Query("created_at", regex="^(created_at|updated_at|application_number|estimated_value|loan_amount)$", description="Field to sort by"),
     sort_order: str = Query("desc", regex="^(asc|desc)$", description="Sort order (ascending or descending)"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Get list of applications with advanced filtering and sorting"""
-    query = db.query(Application)
+    query = select(Application)
     
     # Basic filters
     if status:
@@ -159,7 +159,8 @@ async def get_applications(
     else:
         query = query.order_by(sort_column)
         
-    return query.offset(skip).limit(limit).all()
+    result = await db.execute(query.offset(skip).limit(limit))
+    return result.scalars().all()
 
 @router.get("/{application_id}", 
     response_model=ApplicationSchema,
@@ -192,11 +193,12 @@ async def get_applications(
 )
 async def get_application(
     application_id: int = Path(..., description="ID of the application to retrieve"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Get a specific application by ID"""
-    application = db.query(Application).filter(Application.id == application_id).first()
+    result = await db.execute(select(Application).filter(Application.id == application_id))
+    application = result.scalars().first()
     if not application:
         raise HTTPException(status_code=404, detail="Application not found")
     return application
@@ -233,7 +235,7 @@ async def get_application(
 )
 async def create_application(
     application: ApplicationCreate = Body(..., description="Application details to create"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Create a new application"""
@@ -243,8 +245,8 @@ async def create_application(
     
     db_application = Application(**application_data)
     db.add(db_application)
-    db.commit()
-    db.refresh(db_application)
+    await db.commit()
+    await db.refresh(db_application)
     return db_application
 
 @router.put("/{application_id}", 
@@ -282,11 +284,12 @@ async def create_application(
 async def update_application(
     application_id: int = Path(..., description="ID of the application to update"),
     application_update: ApplicationUpdate = Body(..., description="Data to update"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Update an existing application"""
-    db_application = db.query(Application).filter(Application.id == application_id).first()
+    result = await db.execute(select(Application).filter(Application.id == application_id))
+    db_application = result.scalars().first()
     if not db_application:
         raise HTTPException(status_code=404, detail="Application not found")
     
@@ -307,8 +310,8 @@ async def update_application(
     for field, value in update_data.items():
         setattr(db_application, field, value)
         
-    db.commit()
-    db.refresh(db_application)
+    await db.commit()
+    await db.refresh(db_application)
     return db_application
 
 @router.delete("/{application_id}", 
@@ -330,11 +333,12 @@ async def update_application(
 )
 async def delete_application(
     application_id: int = Path(..., description="ID of the application to delete"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Delete an application"""
-    db_application = db.query(Application).filter(Application.id == application_id).first()
+    result = await db.execute(select(Application).filter(Application.id == application_id))
+    db_application = result.scalars().first()
     if not db_application:
         raise HTTPException(status_code=404, detail="Application not found")
     
@@ -345,8 +349,8 @@ async def delete_application(
             detail="Cannot delete applications that have been processed"
         )
         
-    db.delete(db_application)
-    db.commit()
+    await db.delete(db_application)
+    await db.commit()
     return None
 
 @router.post("/bulk-update", 
@@ -382,11 +386,12 @@ async def delete_application(
 )
 async def bulk_update_applications(
     request: BulkUpdateRequest = Body(..., description="Bulk update request data"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Bulk update multiple applications"""
-    applications = db.query(Application).filter(Application.id.in_(request.application_ids)).all()
+    result = await db.execute(select(Application).filter(Application.id.in_(request.application_ids)))
+    applications = result.scalars().all()
     if not applications:
         raise HTTPException(status_code=404, detail="No applications found")
     
@@ -411,9 +416,9 @@ async def bulk_update_applications(
         
         updated_applications.append(application)
     
-    db.commit()
+    await db.commit()
     for application in updated_applications:
-        db.refresh(application)
+        await db.refresh(application)
     return updated_applications
 
 @router.post("/bulk-delete", 
@@ -436,11 +441,12 @@ async def bulk_update_applications(
 )
 async def bulk_delete_applications(
     application_ids: List[int] = Body(..., description="List of application IDs to delete"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Bulk delete multiple applications"""
-    applications = db.query(Application).filter(Application.id.in_(application_ids)).all()
+    result = await db.execute(select(Application).filter(Application.id.in_(application_ids)))
+    applications = result.scalars().all()
     if not applications:
         raise HTTPException(status_code=404, detail="No applications found")
     
@@ -453,9 +459,9 @@ async def bulk_delete_applications(
         )
     
     for application in applications:
-        db.delete(application)
+        await db.delete(application)
     
-    db.commit()
+    await db.commit()
     return None
 
 @router.get("/stats", 
@@ -495,7 +501,7 @@ async def get_application_stats(
     branch_id: Optional[int] = Query(None, description="Filter statistics by branch ID"),
     start_date: Optional[date] = Query(None, description="Start date for statistics"),
     end_date: Optional[date] = Query(None, description="End date for statistics"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Get application statistics"""
@@ -570,7 +576,7 @@ async def get_application_stats(
 async def get_application_trends(
     days: int = Query(30, ge=1, le=365, description="Number of days to analyze"),
     branch_id: Optional[int] = Query(None, description="Filter trends by branch ID"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Get application trends over time"""
@@ -650,7 +656,7 @@ async def export_applications(
     branch_id: Optional[int] = Query(None, description="Filter by branch ID"),
     start_date: Optional[date] = Query(None, description="Start date for export"),
     end_date: Optional[date] = Query(None, description="End date for export"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Export applications in CSV or JSON format"""

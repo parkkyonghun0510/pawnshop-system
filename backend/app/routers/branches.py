@@ -1,8 +1,8 @@
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, Path
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
+from app.database import get_async_db
 from app.models.users import User
 from app.models.organization import Branch
 from app.schemas.branches import BranchCreate, BranchUpdate, BranchResponse
@@ -11,20 +11,22 @@ from app.core.security import get_current_user_with_cookie
 router = APIRouter()
 
 @router.get("/", response_model=List[BranchResponse])
-def get_branches(
+async def read_branches(
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Get list of branches"""
+    result = await db.execute(select(Branch).offset(skip).limit(limit))
+    branches = result.scalars().all()
     branches = db.query(Branch).offset(skip).limit(limit).all()
     return branches
 
 @router.get("/{branch_id}", response_model=BranchResponse)
 def get_branch(
     branch_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Get a specific branch by ID"""
@@ -34,9 +36,9 @@ def get_branch(
     return branch
 
 @router.post("/", response_model=BranchResponse)
-def create_branch(
+async def create_branch(
     branch: BranchCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Create a new branch"""
@@ -47,10 +49,10 @@ def create_branch(
     return db_branch
 
 @router.put("/{branch_id}", response_model=BranchResponse)
-def update_branch(
+async def update_branch(
     branch_id: int,
     branch_update: BranchUpdate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Update a branch"""
@@ -66,9 +68,9 @@ def update_branch(
     return db_branch
 
 @router.delete("/{branch_id}")
-def delete_branch(
+async def delete_branch(
     branch_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Delete a branch"""

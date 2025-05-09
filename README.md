@@ -142,4 +142,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - FastAPI team for the excellent framework
 - React team for the frontend library
 - Material-UI team for the component library
-- All contributors who help improve this project 
+- All contributors who help improve this project autumn.henry

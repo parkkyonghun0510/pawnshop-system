@@ -3,7 +3,8 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.core.config import settings
 from app.core.security import (
@@ -12,14 +13,14 @@ from app.core.security import (
     verify_password,
     get_current_user_with_cookie
 )
-from app.database import get_db
+from app.database import get_async_db
 from app.models.users import User, Role
 from app.schemas.auth import Token, Login, UserCreate, UserResponse, PasswordReset, PasswordChange
 from app.auth.permissions import ROLE_PERMISSIONS
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-def authenticate_user(db: Session, username_or_email: str, password: str) -> User:
+def authenticate_user(db: AsyncSession, username_or_email: str, password: str) -> User:
     """Authenticates a user by username or email and password"""
     # Try to find user by username
     user = db.query(User).filter(User.username == username_or_email).first()
@@ -39,14 +40,16 @@ def authenticate_user(db: Session, username_or_email: str, password: str) -> Use
 async def login(
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ) -> Any:
     # Try to find user by username first
-    user = db.query(User).filter(User.username == form_data.username).first()
+    result = await db.execute(select(User).where(User.username == form_data.username))
+    user = result.scalar_one_or_none()
 
     # If not found by username, try email
     if not user:
-        user = db.query(User).filter(User.email == form_data.username).first()
+        result = await db.execute(select(User).where(User.email == form_data.username))
+        user = result.scalar_one_or_none()
 
     # If user not found or password doesn't match
     if not user or not user.verify_password(form_data.password):
@@ -108,7 +111,7 @@ async def login(
 @router.post("/login", response_model=Token)
 def login_for_access_token(
     response: Response,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     login_data: Login = None
 ) -> Any:
     """
@@ -142,7 +145,7 @@ def login_for_access_token(
 @router.post("/register", response_model=UserResponse)
 def register_new_user(
     user_in: UserCreate,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ) -> Any:
     """
     Create new user
@@ -189,7 +192,7 @@ def register_new_user(
 @router.post("/password-reset", response_model=dict)
 def reset_password(
     email_in: PasswordReset,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ) -> Any:
     """
     Password recovery
@@ -210,7 +213,7 @@ def reset_password(
 def change_password(
     password_data: PasswordChange,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user = Depends(get_current_user_with_cookie)
 ) -> Any:
     """
@@ -232,7 +235,7 @@ def change_password(
 @router.get("/me", response_model=UserResponse)
 def read_users_me(
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user = Depends(get_current_user_with_cookie)
 ) -> Any:
     """
@@ -292,7 +295,7 @@ async def logout(response: Response):
 
 
 @router.get("/verify")
-async def verify_token(current_user: User = Depends(get_current_user_with_cookie)) -> Any:
+async def refresh_token(current_user: User = Depends(get_current_user_with_cookie)) -> Any:
     return {
         "id": current_user.id,
         "username": current_user.username,

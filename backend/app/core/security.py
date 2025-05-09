@@ -8,7 +8,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.database import get_db
+
 
 # Setup password hashing context
 # Include both bcrypt and bcrypt_sha256, but mark bcrypt as deprecated
@@ -102,7 +102,7 @@ async def get_token_from_cookie_or_header(request: Request):
 
 async def get_current_user_with_cookie(
     request: Request,
-    db: Session = Depends(get_db)
+    
 ):
     """
     Validate token and get current user (supports both header and cookie auth)

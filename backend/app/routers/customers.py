@@ -4,9 +4,9 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status, Body
 from sqlalchemy import or_, and_, func, extract
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
+from app.database import get_async_db
 from app.models.operations import Customer, Loan, Item
 from app.models.users import User
 from app.schemas.customers import (
@@ -28,8 +28,8 @@ def generate_customer_code() -> str:
 
 
 @router.get("/", response_model=List[CustomerSchema])
-def read_customers(
-    db: Session = Depends(get_db),
+async def read_customers(
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie),
     skip: int = 0,
     limit: int = 100,
@@ -64,9 +64,9 @@ def read_customers(
 
 
 @router.post("/", response_model=CustomerSchema)
-def create_customer(
+async def create_customer(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     customer_in: CustomerCreate,
     current_user: User = Depends(get_current_user_with_cookie)
 ) -> Any:
@@ -109,7 +109,7 @@ def create_customer(
 @router.get("/{customer_id}", response_model=CustomerSchema)
 def read_customer(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     customer_id: int = Path(..., gt=0),
     current_user: User = Depends(get_current_user_with_cookie)
 ) -> Any:
@@ -128,9 +128,9 @@ def read_customer(
 
 
 @router.put("/{customer_id}", response_model=CustomerSchema)
-def update_customer(
+async def update_customer(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     customer_id: int = Path(..., gt=0),
     customer_in: CustomerUpdate,
     current_user: User = Depends(get_current_user_with_cookie)
@@ -186,9 +186,9 @@ def update_customer(
 
 
 @router.delete("/{customer_id}", response_model=CustomerSchema)
-def delete_customer(
+async def delete_customer(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     customer_id: int = Path(..., gt=0),
     current_user: User = Depends(get_current_user_with_cookie)
 ) -> Any:
@@ -230,7 +230,7 @@ def delete_customer(
 @router.post("/search", response_model=List[CustomerSchema])
 def search_customers(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     search_params: CustomerSearchParams,
     current_user: User = Depends(get_current_user_with_cookie),
     skip: int = 0,
@@ -280,7 +280,7 @@ def search_customers(
 
 @router.get("/stats/overview", response_model=CustomerStats)
 def get_customer_stats(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ) -> Any:
     """

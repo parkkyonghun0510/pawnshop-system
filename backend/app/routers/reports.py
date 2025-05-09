@@ -3,7 +3,7 @@ from typing import List, Optional, Dict, Any, Union
 from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Body, Response
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, extract, and_, or_, desc, column, literal
 from sqlalchemy.ext.asyncio import AsyncSession
 from io import StringIO
@@ -12,7 +12,7 @@ import json
 from pydantic import BaseModel, Field
 import uuid
 
-from app.database import get_db
+from app.database import get_async_db
 from app.models.users import User
 from app.models.operations import Loan, Payment, Item, ItemStatus, Customer, Transaction, TransactionType
 from app.models.organization import Employee, Branch
@@ -133,8 +133,8 @@ class RecentActivity(BaseModel):
 
 
 @router.get("/dashboard", response_model=DashboardStats)
-def get_dashboard_stats(
-    db: Session = Depends(get_db),
+async def get_dashboard_stats(
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie),
     days: int = Query(30, description="Number of days to include in charts")
 ) -> Any:
@@ -145,45 +145,42 @@ def get_dashboard_stats(
     start_date = today - timedelta(days=days)
 
     # Get loan statistics
-    loans_query = db.query(Loan)
-    total_loans = loans_query.count()
-    active_loans = loans_query.filter(Loan.status == LoanStatusEnum.ACTIVE).count()
-    overdue_loans = loans_query.filter(Loan.status == LoanStatusEnum.OVERDUE).count()
-    defaulted_loans = loans_query.filter(Loan.status == LoanStatusEnum.DEFAULTED).count()
+    # Get loan statistics
+    loans_query = select(Loan)
+    total_loans = (await db.execute(select(func.count(Loan.id)))).scalar()
+    active_loans = (await db.execute(select(func.count(Loan.id)).where(Loan.status == LoanStatusEnum.ACTIVE))).scalar()
+    overdue_loans = (await db.execute(select(func.count(Loan.id)).where(Loan.status == LoanStatusEnum.OVERDUE))).scalar()
+    defaulted_loans = (await db.execute(select(func.count(Loan.id)).where(Loan.status == LoanStatusEnum.DEFAULTED))).scalar()
 
     # Financial metrics
-    total_loan_amount = db.query(func.sum(Loan.principal_amount)).scalar() or 0
+    total_loan_amount = (await db.execute(select(func.sum(Loan.principal_amount)))).scalar() or 0
 
     # Calculate interest earned from payments
-    payments_sum = db.query(func.sum(Payment.amount)).scalar() or 0
+    payments_sum = (await db.execute(select(func.sum(Payment.amount)))).scalar() or 0
     total_interest_earned = payments_sum - total_loan_amount if payments_sum > total_loan_amount else 0
 
     # Sales statistics
-    sales_query = db.query(Transaction).filter(Transaction.transaction_type == TransactionType.SALE)
-    total_sales = db.query(func.sum(Transaction.amount)).filter(
-        Transaction.transaction_type == TransactionType.SALE
-    ).scalar() or 0
+    total_sales = (await db.execute(select(func.sum(Transaction.amount)).where(Transaction.transaction_type == TransactionType.SALE))).scalar() or 0
 
     # Sales today
-    sales_today = db.query(func.sum(Transaction.amount)).filter(
+    sales_today = (await db.execute(select(func.sum(Transaction.amount)).where(
         Transaction.transaction_type == TransactionType.SALE,
         func.date(Transaction.transaction_date) == today
-    ).scalar() or 0
+    ))).scalar() or 0
 
     # Inventory value
-    total_inventory_value = db.query(func.sum(Item.appraised_value)).filter(
+    total_inventory_value = (await db.execute(select(func.sum(Item.appraised_value)).where(
         Item.status.in_(['PAWNED', 'AVAILABLE'])
-    ).scalar() or 0
+    ))).scalar() or 0
 
     # Customer statistics
-    customers_query = db.query(Customer)
-    total_customers = customers_query.count()
+    total_customers = (await db.execute(select(func.count(Customer.id)))).scalar()
 
     # New customers this month
-    new_customers_this_month = customers_query.filter(
+    new_customers_this_month = (await db.execute(select(func.count(Customer.id)).where(
         extract('year', Customer.created_at) == today.year,
         extract('month', Customer.created_at) == today.month
-    ).count()
+    ))).scalar()
 
     # Daily revenue chart data
     revenue_by_day = []
@@ -194,10 +191,10 @@ def get_dashboard_stats(
         next_date = current_date + timedelta(days=1)
 
         # Revenue for the day
-        daily_revenue = db.query(func.sum(Transaction.amount)).filter(
+        daily_revenue = (await db.execute(select(func.sum(Transaction.amount)).where(
             Transaction.transaction_date >= current_date,
             Transaction.transaction_date < next_date
-        ).scalar() or 0
+        ))).scalar() or 0
 
         revenue_by_day.append({
             "date": current_date.isoformat(),
@@ -205,9 +202,9 @@ def get_dashboard_stats(
         })
 
         # Loan applications for the day
-        daily_loans = db.query(func.count(Loan.id)).filter(
+        daily_loans = (await db.execute(select(func.count(Loan.id)).where(
             func.date(Loan.created_at) == current_date
-        ).scalar() or 0
+        ))).scalar() or 0
 
         loan_applications_by_day.append({
             "date": current_date.isoformat(),
@@ -233,7 +230,7 @@ def get_dashboard_stats(
 
 @router.get("/sales", response_model=SalesReport)
 def get_sales_report(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie),
     start_date: Optional[date] = Query(None, description="Start date for report"),
     end_date: Optional[date] = Query(None, description="End date for report"),
@@ -347,7 +344,7 @@ def get_sales_report(
 
 @router.get("/loans", response_model=LoanReport)
 def get_loan_report(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie),
     start_date: Optional[date] = Query(None, description="Start date for report"),
     end_date: Optional[date] = Query(None, description="End date for report"),
@@ -447,7 +444,7 @@ def get_loan_report(
 
 @router.get("/inventory", response_model=InventoryReport)
 def get_inventory_report(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie),
     branch_id: Optional[int] = Query(None, description="Filter by branch ID")
 ) -> Any:
@@ -542,7 +539,7 @@ def get_inventory_report(
 
 @router.get("/customers", response_model=CustomerReport)
 def get_customer_report(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie),
     branch_id: Optional[int] = Query(None, description="Filter by branch ID")
 ) -> Any:
@@ -655,7 +652,7 @@ def get_customer_report(
 
 @router.get("/export/sales")
 def export_sales_report(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie),
     start_date: Optional[date] = Query(None, description="Start date for report"),
     end_date: Optional[date] = Query(None, description="End date for report"),
@@ -745,7 +742,7 @@ def export_sales_report(
 
 @router.get("/export/loans")
 def export_loan_report(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie),
     start_date: Optional[date] = Query(None, description="Start date for report"),
     end_date: Optional[date] = Query(None, description="End date for report"),
@@ -846,7 +843,7 @@ def export_loan_report(
 
 @router.get("/dashboard/branch-performance", response_model=List[BranchPerformance])
 async def get_branch_performance(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Get performance metrics for each branch"""
@@ -876,7 +873,7 @@ async def get_branch_performance(
 
 @router.get("/dashboard/inventory-status", response_model=List[InventoryStatus])
 async def get_inventory_status(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Get inventory status breakdown"""
@@ -907,7 +904,7 @@ async def get_inventory_status(
 @router.get("/dashboard/recent-transactions", response_model=List[RecentTransaction])
 async def get_recent_transactions(
     limit: int = 5,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Get recent transactions"""
@@ -934,7 +931,7 @@ async def get_recent_transactions(
 @router.get("/dashboard/upcoming-due-loans", response_model=List[UpcomingDueLoan])
 async def get_upcoming_due_loans(
     days: int = 7,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Get loans due in the next X days"""
@@ -969,7 +966,7 @@ async def get_upcoming_due_loans(
 @router.get("/dashboard/recent-activity", response_model=List[RecentActivity])
 async def get_recent_activity(
     limit: int = 10,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ):
     """Get recent activity across the system"""

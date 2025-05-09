@@ -1,11 +1,26 @@
 import { useState, useEffect } from 'react';
 import dayjs from 'dayjs';
-import { WebSocketData, BranchPerformance, InventoryStatus } from '../pages/dashboard/types';
+import { WebSocketData, BranchPerformance, InventoryStatus, DashboardStats } from '../pages/dashboard/types';
 
 // Get WebSocket URL from environment or use default
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/dashboard';
 
 // Mock data for WebSocket to use when endpoints are not available
+const mockDashboardStats: DashboardStats = {
+  total_items: 265,
+  active_loans: 145,
+  total_revenue: 58900,
+  total_customers: 320,
+  total_branches: 4,
+  total_transactions: 450,
+  total_users: 15,
+  total_employees: 25,
+  revenue_by_day: Array.from({ length: 30 }, (_, i) => ({
+    date: dayjs().subtract(29 - i, 'day').format('YYYY-MM-DD'),
+    value: Math.floor(Math.random() * 5000) + 1000
+  }))
+};
+
 const mockBranchPerformance: BranchPerformance[] = [
   { name: 'Main Branch', loans: 145, revenue: 28500, items: 210 },
   { name: 'Downtown', loans: 98, revenue: 19200, items: 156 },
@@ -45,6 +60,8 @@ export const useDashboardWebSocket = () => {
           // Add mock data for endpoints that are not yet implemented
           const enhancedData: WebSocketData = {
             ...newData,
+            // Use mock data for stats if not provided by the server
+            stats: newData.stats || mockDashboardStats,
             // Use mock data for branch performance if not provided by the server
             branchPerformance: newData.branchPerformance || mockBranchPerformance,
             // Use mock data for inventory status if not provided by the server
@@ -70,12 +87,12 @@ export const useDashboardWebSocket = () => {
 
         // Provide mock data even when WebSocket fails
         setData({
-          stats: null, // Let the React Query handle stats
+          stats: mockDashboardStats,
           branchPerformance: mockBranchPerformance,
           inventoryStatus: mockInventoryStatus
         });
 
-        ws?.close();
+        // ws?.close(); // Removed to avoid closing the WebSocket immediately on error
       };
     };
 

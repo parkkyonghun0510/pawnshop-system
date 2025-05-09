@@ -3,8 +3,7 @@ import json
 from typing import List, Dict, Any
 from fastapi import WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session
-from app.database import get_db
+from app.database import get_async_db
 from app.routers.reports import get_dashboard_stats, get_branch_performance, get_inventory_status
 
 class DashboardWebSocketManager:
@@ -29,9 +28,11 @@ class DashboardWebSocketManager:
     async def broadcast_updates(self):
         while True:
             try:
-                # Get latest dashboard data
-                db = next(get_db())
-                dashboard_data = self.get_dashboard_data(db)
+                # Get latest dashboard data using async DB session
+                async for db in get_async_db():
+                    dashboard_data = await self.get_dashboard_data(db)
+                    dashboard_data = self._convert_decimal_to_float(dashboard_data)
+                    break  # Only need one session per update
                 
                 # Send to all connected clients
                 for connection in self.active_connections:
@@ -45,12 +46,19 @@ class DashboardWebSocketManager:
                 print(f"Error in dashboard broadcast: {e}")
                 await asyncio.sleep(5)  # Wait before retry
 
-    def get_dashboard_data(self, db: Session) -> Dict[str, Any]:
+    async def get_dashboard_data(self, db: AsyncSession) -> Dict[str, Any]:
         """Gather all dashboard data"""
+        import asyncio
         try:
             stats = get_dashboard_stats(db=db, days=30)
+            if asyncio.iscoroutine(stats):
+                stats = await stats
             branch_performance = get_branch_performance(db=db)
+            if asyncio.iscoroutine(branch_performance):
+                branch_performance = await branch_performance
             inventory_status = get_inventory_status(db=db)
+            if asyncio.iscoroutine(inventory_status):
+                inventory_status = await inventory_status
             
             return {
                 "stats": stats,
@@ -65,6 +73,20 @@ class DashboardWebSocketManager:
                 "inventoryStatus": None,
                 "error": str(e)
             }
+
+    def _convert_decimal_to_float(self, obj):
+        """Recursively convert Decimal objects to float in dicts/lists"""
+        import decimal
+        if isinstance(obj, dict):
+            return {k: self._convert_decimal_to_float(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._convert_decimal_to_float(i) for i in obj]
+        elif isinstance(obj, tuple):
+            return tuple(self._convert_decimal_to_float(i) for i in obj)
+        elif isinstance(obj, decimal.Decimal):
+            return float(obj)
+        else:
+            return obj
 
 # Create a singleton instance
 dashboard_manager = DashboardWebSocketManager()

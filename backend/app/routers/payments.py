@@ -1,8 +1,8 @@
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
+from app.database import get_async_db
 from app.models.users import User
 from app.models.operations import Payment, Loan
 from app.schemas.loans import Payment as PaymentSchema, PaymentCreate, PaymentUpdate
@@ -45,18 +45,16 @@ router = APIRouter(
         }
     }
 )
-def list_payments(
-    db: Session = Depends(get_db),
+async def read_payments(
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie),
     loan_id: Optional[int] = Query(None, description="Filter payments by loan ID"),
     skip: int = Query(0, description="Number of records to skip"),
     limit: int = Query(100, description="Maximum number of records to return")
 ) -> Any:
     """List all payments with optional filtering."""
-    query = db.query(Payment)
-    if loan_id:
-        query = query.filter(Payment.loan_id == loan_id)
-    payments = query.offset(skip).limit(limit).all()
+    query = await db.execute(select(Payment).filter(Payment.loan_id == loan_id) if loan_id else select(Payment))
+    payments = query.scalars().offset(skip).limit(limit).all()
     return payments
 
 @router.get("/{payment_id}", 
@@ -70,13 +68,15 @@ def list_payments(
         }
     }
 )
-def get_payment(
+async def read_payment_by_id(
     payment_id: int = Path(..., gt=0, description="The ID of the payment to retrieve"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ) -> Any:
     """Get a specific payment by ID."""
-    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    query = select(Payment).filter(Payment.id == payment_id)
+    result = await db.execute(query)
+    payment = result.scalars().first()
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
     return payment
@@ -98,9 +98,9 @@ def get_payment(
         }
     }
 )
-def update_payment(
+async def update_payment(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie),
     payment_id: int = Path(..., gt=0, description="The ID of the payment to update"),
     payment_in: PaymentUpdate
@@ -131,9 +131,9 @@ def update_payment(
         400: {"description": "Cannot delete payment from a completed or defaulted loan"}
     }
 )
-def delete_payment(
+async def delete_payment(
     payment_id: int = Path(..., gt=0, description="The ID of the payment to delete"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ) -> Any:
     """Delete a payment with status validation."""

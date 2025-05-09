@@ -1,9 +1,9 @@
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, Path
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
+from app.database import get_async_db
 from app.models.users import User, Role, Permission
 from app.schemas.users import (
     User as UserSchema,
@@ -29,14 +29,13 @@ router = APIRouter()
 # --- User Routes ---
 
 @router.get("/", response_model=List[UserResponse])
-def read_users(
-    request: Request,
-    db: Session = Depends(get_db),
+async def read_users(
+    db: AsyncSession = Depends(get_async_db),
+    current_user = Depends(get_current_user_with_cookie),
     skip: int = 0,
     limit: int = 100,
-    email: Optional[str] = Query(None),
-    username: Optional[str] = Query(None),
-    current_user = Depends(get_current_user_with_cookie)
+    email: Optional[str] = None,
+    username: Optional[str] = None
 ) -> Any:
     """
     Retrieve users.
@@ -47,36 +46,35 @@ def read_users(
             status_code=403,
             detail="Not enough permissions to access this resource"
         )
-    
     # Build query with filters
-    query = db.query(User)
-    
+    query = select(User)
     if email:
-        query = query.filter(User.email.ilike(f"%{email}%"))
+        query = query.where(User.email.ilike(f"%{email}%"))
     if username:
-        query = query.filter(User.username.ilike(f"%{username}%"))
-    
-    users = query.offset(skip).limit(limit).all()
+        query = query.where(User.username.ilike(f"%{username}%"))
+    query = query.offset(skip).limit(limit)
+    result = await db.execute(query)
+    users = result.scalars().all()
     return users
 
 
 @router.post("/", response_model=UserResponse)
-def create_user(
+async def create_user(
     user_in: UserCreate,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user = Depends(get_current_user_with_cookie)
 ) -> Any:
     """
     Create new user.
     """
-    user = db.query(User).filter(User.email == user_in.email).first()
+    result = await db.execute(select(User).where(User.email == user_in.email))
+    user = result.scalar_one_or_none()
     if user:
         raise HTTPException(
             status_code=400,
             detail="The user with this email already exists in the system.",
         )
-    
     # Create new user
     db_user = User(
         email=user_in.email,
@@ -85,6 +83,11 @@ def create_user(
         is_superuser=user_in.is_superuser,
         role_id=user_in.role_id
     )
+    db.add(db_user)
+    await db.commit()
+    await db.refresh(db_user)
+    return db_user
+
     db_user.set_password(user_in.password)
     db.add(db_user)
     db.commit()
@@ -93,10 +96,10 @@ def create_user(
 
 
 @router.get("/{user_id}", response_model=UserResponse)
-def read_user_by_id(
+async def read_user_by_id(
     user_id: int,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user = Depends(get_current_user_with_cookie)
 ) -> Any:
     """
@@ -120,11 +123,11 @@ def read_user_by_id(
 
 
 @router.put("/{user_id}", response_model=UserResponse)
-def update_user(
+async def update_user(
     user_id: int,
     user_in: UserUpdate,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user = Depends(get_current_user_with_cookie)
 ) -> Any:
     """
@@ -170,10 +173,10 @@ def update_user(
 
 
 @router.delete("/{user_id}", response_model=UserResponse)
-def delete_user(
+async def delete_user(
     user_id: int,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user = Depends(get_current_user_with_cookie)
 ) -> Any:
     """
@@ -201,8 +204,8 @@ def delete_user(
 # --- Role Routes ---
 
 @router.get("/roles/", response_model=List[RoleSchema])
-def read_roles(
-    db: Session = Depends(get_db),
+async def read_roles(
+    db: AsyncSession = Depends(get_async_db),
     skip: int = 0,
     limit: int = 100,
     current_user: User = Depends(get_current_user_with_cookie),
@@ -210,44 +213,46 @@ def read_roles(
     """
     Retrieve roles.
     """
-    roles = db.query(Role).offset(skip).limit(limit).all()
+    result = await db.execute(select(Role).offset(skip).limit(limit))
+    roles = result.scalars().all()
     return roles
 
 
 @router.post("/roles/", response_model=RoleSchema)
-def create_role(
+async def create_role(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     role_in: RoleCreate,
     current_user: User = Depends(get_current_active_superuser_with_cookie),
 ) -> Any:
     """
     Create new role.
     """
-    role = db.query(Role).filter(Role.name == role_in.name).first()
+    result = await db.execute(select(Role).where(Role.name == role_in.name))
+    role = result.scalar_one_or_none()
     if role:
         raise HTTPException(
             status_code=400,
             detail="The role with this name already exists.",
         )
-    
     role = Role(**role_in.dict())
     db.add(role)
-    db.commit()
-    db.refresh(role)
+    await db.commit()
+    await db.refresh(role)
     return role
 
 
 @router.get("/roles/{role_id}", response_model=RoleSchema)
-def read_role_by_id(
+async def read_role_by_id(
     role_id: int = Path(..., gt=0),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie),
 ) -> Any:
     """
     Get a specific role by id.
     """
-    role = db.query(Role).filter(Role.id == role_id).first()
+    result = await db.execute(select(Role).where(Role.id == role_id))
+    role = result.scalar_one_or_none()
     if not role:
         raise HTTPException(
             status_code=404,
@@ -257,9 +262,9 @@ def read_role_by_id(
 
 
 @router.put("/roles/{role_id}", response_model=RoleSchema)
-def update_role(
+async def update_role(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     role_id: int = Path(..., gt=0),
     role_in: RoleUpdate,
     current_user: User = Depends(get_current_active_superuser_with_cookie),
@@ -267,35 +272,35 @@ def update_role(
     """
     Update a role.
     """
-    role = db.query(Role).filter(Role.id == role_id).first()
+    result = await db.execute(select(Role).where(Role.id == role_id))
+    role = result.scalar_one_or_none()
     if not role:
         raise HTTPException(
             status_code=404,
             detail="Role not found",
         )
-    
     # Update role data
     update_data = role_in.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(role, field, value)
-    
     db.add(role)
-    db.commit()
-    db.refresh(role)
+    await db.commit()
+    await db.refresh(role)
     return role
 
 
 @router.delete("/roles/{role_id}", response_model=RoleSchema)
-def delete_role(
+async def delete_role(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     role_id: int = Path(..., gt=0),
     current_user: User = Depends(get_current_active_superuser_with_cookie),
 ) -> Any:
     """
     Delete a role.
     """
-    role = db.query(Role).filter(Role.id == role_id).first()
+    result = await db.execute(select(Role).where(Role.id == role_id))
+    role = result.scalar_one_or_none()
     if not role:
         raise HTTPException(
             status_code=404,
@@ -303,11 +308,12 @@ def delete_role(
         )
     
     # Check if any users are using this role
-    users_with_role = db.query(User).filter(User.role_id == role_id).count()
-    if users_with_role > 0:
+    result = await db.execute(select(User).where(User.role_id == role_id))
+    users_with_role = result.scalars().all()
+    if len(users_with_role) > 0:
         raise HTTPException(
             status_code=400,
-            detail=f"Cannot delete role that is assigned to {users_with_role} users",
+            detail=f"Cannot delete role that is assigned to {len(users_with_role)} users",
         )
     
     db.delete(role)
@@ -319,7 +325,7 @@ def delete_role(
 
 @router.get("/permissions/", response_model=List[PermissionSchema])
 def read_permissions(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     skip: int = 0,
     limit: int = 100,
     current_user: User = Depends(get_current_user_with_cookie),
@@ -334,7 +340,7 @@ def read_permissions(
 @router.post("/permissions/", response_model=PermissionSchema)
 def create_permission(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     permission_in: PermissionCreate,
     current_user: User = Depends(get_current_active_superuser_with_cookie),
 ) -> Any:
@@ -358,7 +364,7 @@ def create_permission(
 @router.get("/permissions/{permission_id}", response_model=PermissionSchema)
 def read_permission_by_id(
     permission_id: int = Path(..., gt=0),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie),
 ) -> Any:
     """
@@ -376,7 +382,7 @@ def read_permission_by_id(
 @router.put("/permissions/{permission_id}", response_model=PermissionSchema)
 def update_permission(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     permission_id: int = Path(..., gt=0),
     permission_in: PermissionUpdate,
     current_user: User = Depends(get_current_active_superuser_with_cookie),
@@ -405,7 +411,7 @@ def update_permission(
 @router.delete("/permissions/{permission_id}", response_model=PermissionSchema)
 def delete_permission(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     permission_id: int = Path(..., gt=0),
     current_user: User = Depends(get_current_active_superuser_with_cookie),
 ) -> Any:

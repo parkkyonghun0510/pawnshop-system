@@ -4,9 +4,10 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Body, status
 from sqlalchemy import or_, and_, func, extract, desc
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
-from app.database import get_db
+from app.database import get_async_db
 from app.models.operations import Transaction, TransactionType, Customer, Item, Loan
 from app.models.users import User
 from app.models.organization import Employee
@@ -33,8 +34,8 @@ def generate_transaction_code() -> str:
 
 
 @router.get("/", response_model=List[TransactionSchema])
-def read_transactions(
-    db: Session = Depends(get_db),
+async def read_transactions(
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie),
     skip: int = 0,
     limit: int = 100,
@@ -47,7 +48,7 @@ def read_transactions(
     """
     Retrieve transactions with optional filtering.
     """
-    query = db.query(Transaction)
+    query = select(Transaction)
     
     # Apply filters
     if transaction_type:
@@ -66,15 +67,18 @@ def read_transactions(
         query = query.filter(Transaction.transaction_date <= end_date)
     
     # Apply pagination
-    transactions = query.order_by(Transaction.transaction_date.desc()).offset(skip).limit(limit).all()
+    query = query.order_by(Transaction.transaction_date.desc()).offset(skip).limit(limit)
+    
+    result = await db.execute(query)
+    transactions = result.scalars().all()
     
     return transactions
 
 
 @router.post("/", response_model=TransactionSchema)
-def create_transaction(
+async def create_transaction(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     transaction_in: TransactionCreate,
     current_user: User = Depends(get_current_user_with_cookie)
 ) -> Any:
@@ -145,7 +149,7 @@ def create_transaction(
 @router.get("/{transaction_id}", response_model=TransactionWithDetails)
 def read_transaction(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     transaction_id: int = Path(..., gt=0),
     current_user: User = Depends(get_current_user_with_cookie)
 ) -> Any:
@@ -191,9 +195,9 @@ def read_transaction(
 
 
 @router.put("/{transaction_id}", response_model=TransactionSchema)
-def update_transaction(
+async def update_transaction(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     transaction_id: int = Path(..., gt=0),
     transaction_in: TransactionUpdate,
     current_user: User = Depends(get_current_user_with_cookie)
@@ -234,7 +238,7 @@ def update_transaction(
 @router.put("/{transaction_id}/cancel", response_model=TransactionSchema)
 def cancel_transaction(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     transaction_id: int = Path(..., gt=0),
     notes: Optional[str] = Body(None, embed=True),
     current_user: User = Depends(get_current_user_with_cookie)
@@ -275,7 +279,7 @@ def cancel_transaction(
 @router.put("/{transaction_id}/complete", response_model=TransactionSchema)
 def complete_transaction(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     transaction_id: int = Path(..., gt=0),
     notes: Optional[str] = Body(None, embed=True),
     current_user: User = Depends(get_current_user_with_cookie)
@@ -316,7 +320,7 @@ def complete_transaction(
 @router.post("/search", response_model=List[TransactionSchema])
 def search_transactions(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     search_params: TransactionSearchParams,
     current_user: User = Depends(get_current_user_with_cookie),
     skip: int = 0,
@@ -378,7 +382,7 @@ def search_transactions(
 
 @router.get("/stats/overview", response_model=TransactionStats)
 def get_transaction_stats(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie),
     start_date: Optional[date] = None,
     end_date: Optional[date] = None

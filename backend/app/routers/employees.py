@@ -1,12 +1,12 @@
 from typing import List, Optional, Any, Dict
 from datetime import date, datetime
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Body
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, extract, cast, String
 from sqlalchemy.sql import label
 from sqlalchemy.sql.expression import or_
 
-from app.database import get_db
+from app.database import get_async_db
 from app.models.organization import Employee, EmployeeType, Branch
 from app.models.users import User
 from app.schemas.employees import (
@@ -30,8 +30,8 @@ router = APIRouter(
 
 
 @router.get("/", response_model=List[EmployeeWithDetails])
-def read_employees(
-    db: Session = Depends(get_db),
+async def read_employees(
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie),
     skip: int = 0,
     limit: int = 100,
@@ -94,9 +94,9 @@ def read_employees(
 
 
 @router.post("/", response_model=EmployeeSchema)
-def create_employee(
+async def create_employee(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     employee_in: EmployeeCreate,
     current_user: User = Depends(get_current_user_with_cookie)
 ) -> Any:
@@ -139,7 +139,7 @@ def create_employee(
 @router.get("/{employee_id}", response_model=EmployeeWithDetails)
 def read_employee(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     employee_id: int = Path(..., gt=0),
     current_user: User = Depends(get_current_user_with_cookie)
 ) -> Any:
@@ -189,9 +189,9 @@ def read_employee(
 
 
 @router.put("/{employee_id}", response_model=EmployeeSchema)
-def update_employee(
+async def update_employee(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     employee_id: int = Path(..., gt=0),
     employee_in: EmployeeUpdate,
     current_user: User = Depends(get_current_user_with_cookie)
@@ -235,9 +235,9 @@ def update_employee(
 
 
 @router.delete("/{employee_id}", response_model=EmployeeSchema)
-def delete_employee(
+async def delete_employee(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     employee_id: int = Path(..., gt=0),
     current_user: User = Depends(get_current_user_with_cookie)
 ) -> Any:
@@ -267,7 +267,7 @@ def delete_employee(
 @router.post("/search", response_model=List[EmployeeWithDetails])
 def search_employees(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     search_params: EmployeeSearchParams,
     current_user: User = Depends(get_current_user_with_cookie),
     skip: int = 0,
@@ -344,7 +344,7 @@ def search_employees(
 
 @router.get("/stats/overview", response_model=EmployeeStats)
 def get_employee_stats(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie)
 ) -> Any:
     """
@@ -423,8 +423,8 @@ def get_employee_stats(
 
 # Employee Type Endpoints
 @router.get("/types/", response_model=List[EmployeeTypeSchema])
-def read_employee_types(
-    db: Session = Depends(get_db),
+async def read_employee_types(
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie),
     skip: int = 0,
     limit: int = 100
@@ -439,7 +439,7 @@ def read_employee_types(
 @router.post("/types/", response_model=EmployeeTypeSchema)
 def create_employee_type(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     employee_type_in: EmployeeTypeCreate,
     current_user: User = Depends(get_current_user_with_cookie)
 ) -> Any:
@@ -467,7 +467,7 @@ def create_employee_type(
 @router.get("/types/{employee_type_id}", response_model=EmployeeTypeSchema)
 def read_employee_type(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     employee_type_id: int = Path(..., gt=0),
     current_user: User = Depends(get_current_user_with_cookie)
 ) -> Any:
@@ -484,7 +484,7 @@ def read_employee_type(
 @router.put("/types/{employee_type_id}", response_model=EmployeeTypeSchema)
 def update_employee_type(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     employee_type_id: int = Path(..., gt=0),
     employee_type_in: EmployeeTypeUpdate,
     current_user: User = Depends(get_current_user_with_cookie)
@@ -520,7 +520,7 @@ def update_employee_type(
 @router.delete("/types/{employee_type_id}", response_model=EmployeeTypeSchema)
 def delete_employee_type(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     employee_type_id: int = Path(..., gt=0),
     current_user: User = Depends(get_current_user_with_cookie)
 ) -> Any:

@@ -4,9 +4,10 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Body, status
 from sqlalchemy import or_, and_, func, extract, desc, case
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
-from app.database import get_db
+from app.database import get_async_db
 from app.models.operations import Loan, Payment, Item, Customer, ItemStatus
 from app.models.users import User
 from app.schemas.loans import (
@@ -40,23 +41,26 @@ def calculate_due_date(start_date: date, term_days: int) -> date:
     return start_date + timedelta(days=term_days)
 
 
-def calculate_loan_details(db: Session, loan: Loan) -> Dict[str, Any]:
+async def calculate_loan_details(db: AsyncSession, loan: Loan) -> Dict[str, Any]:
     """Calculate loan details like total paid, remaining balance, etc."""
-    # Calculate total paid
-    total_paid = db.query(func.sum(Payment.amount)).filter(Payment.loan_id == loan.id).scalar() or 0
-    
+    # Calculate total paid (async)
+    result = await db.execute(
+        select(func.sum(Payment.amount)).where(Payment.loan_id == loan.id)
+    )
+    total_paid = result.scalar() or 0
+
     # Calculate interest
     interest_amount = loan.loan_amount * (loan.interest_rate / 100)
-    
+
     # Calculate remaining balance
     remaining_balance = loan.loan_amount + interest_amount - total_paid
-    
+
     # Calculate days remaining and overdue
     today = date.today()
     days_remaining = (loan.due_date - today).days if loan.due_date > today else 0
     days_overdue = (today - loan.due_date).days if today > loan.due_date else 0
     is_overdue = days_overdue > 0
-    
+
     return {
         "total_paid": total_paid,
         "remaining_balance": remaining_balance,
@@ -67,8 +71,8 @@ def calculate_loan_details(db: Session, loan: Loan) -> Dict[str, Any]:
 
 
 @router.get("/", response_model=List[LoanSchema])
-def read_loans(
-    db: Session = Depends(get_db),
+async def read_loans(
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie),
     skip: int = 0,
     limit: int = 100,
@@ -80,29 +84,29 @@ def read_loans(
     """
     Retrieve loans with optional filtering.
     """
-    query = db.query(Loan)
+    query = select(Loan)
     
     # Apply filters
     if status:
-        query = query.filter(Loan.status == status)
+        query = query.where(Loan.status == status)
     
     if customer_id:
-        query = query.filter(Loan.customer_id == customer_id)
+        query = query.where(Loan.customer_id == customer_id)
     
     if item_id:
-        query = query.filter(Loan.item_id == item_id)
+        query = query.where(Loan.item_id == item_id)
     
     if is_overdue is not None:
         today = date.today()
         if is_overdue:
-            query = query.filter(
+            query = query.where(
                 and_(
                     Loan.due_date < today,
                     Loan.status.in_([LoanStatusEnum.ACTIVE.value, LoanStatusEnum.OVERDUE.value])
                 )
             )
         else:
-            query = query.filter(
+            query = query.where(
                 or_(
                     Loan.due_date >= today,
                     ~Loan.status.in_([LoanStatusEnum.ACTIVE.value, LoanStatusEnum.OVERDUE.value])
@@ -110,11 +114,12 @@ def read_loans(
             )
     
     # Apply pagination
-    loans = query.order_by(Loan.created_at.desc()).offset(skip).limit(limit).all()
+    loans = await db.execute(query.order_by(Loan.created_at.desc()).offset(skip).limit(limit))
+    loans = loans.scalars().all()
     
     # Enhance with calculated fields
     for loan in loans:
-        loan_details = calculate_loan_details(db, loan)
+        loan_details = await calculate_loan_details(db, loan)
         for key, value in loan_details.items():
             setattr(loan, key, value)
     
@@ -122,9 +127,9 @@ def read_loans(
 
 
 @router.post("/", response_model=LoanSchema)
-def create_loan(
+async def create_loan(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     loan_in: LoanCreate,
     current_user: User = Depends(get_current_user_with_cookie)
 ) -> Any:
@@ -207,9 +212,9 @@ def create_loan(
 
 
 @router.get("/{loan_id}", response_model=LoanWithDetails)
-def read_loan(
+async def read_loan(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     loan_id: int = Path(..., gt=0),
     current_user: User = Depends(get_current_user_with_cookie)
 ) -> Any:
@@ -235,7 +240,7 @@ def read_loan(
         )
     
     # Calculate loan details
-    loan_details = calculate_loan_details(db, loan)
+    loan_details = await calculate_loan_details(db, loan)
     for key, value in loan_details.items():
         setattr(loan, key, value)
     
@@ -253,9 +258,9 @@ def read_loan(
 
 
 @router.put("/{loan_id}", response_model=LoanSchema)
-def update_loan(
+async def update_loan(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     loan_id: int = Path(..., gt=0),
     loan_in: LoanUpdate,
     current_user: User = Depends(get_current_user_with_cookie)
@@ -291,7 +296,7 @@ def update_loan(
     db.refresh(loan)
     
     # Calculate loan details
-    loan_details = calculate_loan_details(db, loan)
+    loan_details = await calculate_loan_details(db, loan)
     for key, value in loan_details.items():
         setattr(loan, key, value)
     
@@ -299,9 +304,9 @@ def update_loan(
 
 
 @router.post("/{loan_id}/payments", response_model=PaymentSchema)
-def add_payment(
+async def add_payment(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     loan_id: int = Path(..., gt=0),
     payment_in: PaymentCreate,
     current_user: User = Depends(get_current_user_with_cookie)
@@ -339,7 +344,7 @@ def add_payment(
     db.add(payment)
     
     # Calculate if loan is fully paid
-    loan_details = calculate_loan_details(db, loan)
+    loan_details = await calculate_loan_details(db, loan)
     total_paid_after_payment = loan_details["total_paid"] + payment_in.amount
     
     # If loan is fully paid, mark as completed
@@ -361,9 +366,9 @@ def add_payment(
 
 
 @router.put("/{loan_id}/extend", response_model=LoanSchema)
-def extend_loan(
+async def extend_loan(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     loan_id: int = Path(..., gt=0),
     extension_in: LoanExtend,
     current_user: User = Depends(get_current_user_with_cookie)
@@ -415,7 +420,7 @@ def extend_loan(
     db.refresh(loan)
     
     # Calculate loan details
-    loan_details = calculate_loan_details(db, loan)
+    loan_details = await calculate_loan_details(db, loan)
     for key, value in loan_details.items():
         setattr(loan, key, value)
     
@@ -423,9 +428,9 @@ def extend_loan(
 
 
 @router.put("/{loan_id}/redeem", response_model=LoanSchema)
-def redeem_loan(
+async def redeem_loan(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     loan_id: int = Path(..., gt=0),
     redemption_in: LoanRedeem,
     current_user: User = Depends(get_current_user_with_cookie)
@@ -449,7 +454,7 @@ def redeem_loan(
         )
     
     # Calculate remaining balance
-    loan_details = calculate_loan_details(db, loan)
+    loan_details = await calculate_loan_details(db, loan)
     remaining_balance = loan_details["remaining_balance"]
     
     # Verify redemption payment covers the remaining balance
@@ -492,7 +497,7 @@ def redeem_loan(
     db.refresh(loan)
     
     # Recalculate loan details
-    loan_details = calculate_loan_details(db, loan)
+    loan_details = await calculate_loan_details(db, loan)
     for key, value in loan_details.items():
         setattr(loan, key, value)
     
@@ -500,9 +505,9 @@ def redeem_loan(
 
 
 @router.put("/{loan_id}/default", response_model=LoanSchema)
-def default_loan(
+async def default_loan(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     loan_id: int = Path(..., gt=0),
     default_in: LoanDefault,
     current_user: User = Depends(get_current_user_with_cookie)
@@ -549,7 +554,7 @@ def default_loan(
     db.refresh(loan)
     
     # Calculate loan details
-    loan_details = calculate_loan_details(db, loan)
+    loan_details = await calculate_loan_details(db, loan)
     for key, value in loan_details.items():
         setattr(loan, key, value)
     
@@ -557,9 +562,9 @@ def default_loan(
 
 
 @router.post("/search", response_model=List[LoanSchema])
-def search_loans(
+async def search_loans(
     *,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     search_params: LoanSearchParams,
     current_user: User = Depends(get_current_user_with_cookie),
     skip: int = 0,
@@ -629,7 +634,7 @@ def search_loans(
     
     # Calculate loan details for each loan
     for loan in loans:
-        loan_details = calculate_loan_details(db, loan)
+        loan_details = await calculate_loan_details(db, loan)
         for key, value in loan_details.items():
             setattr(loan, key, value)
     
@@ -637,8 +642,8 @@ def search_loans(
 
 
 @router.get("/stats/overview", response_model=LoanStats)
-def get_loan_stats(
-    db: Session = Depends(get_db),
+async def get_loan_stats(
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user_with_cookie),
     start_date: Optional[date] = None,
     end_date: Optional[date] = None

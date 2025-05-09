@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import apiClient from '../../../api/client';
 import useDashboardWebSocket from '../../../hooks/useDashboardWebSocket';
 import {
   DashboardStats,
@@ -16,12 +15,29 @@ import {
 
 // Mock data for endpoints that are not yet implemented on the backend
 // These endpoints are returning 404 errors:
+// - /api/v1/dashboard/stats
 // - /api/v1/dashboard/branch-performance
 // - /api/v1/dashboard/inventory-status
 // - /api/v1/dashboard/recent-transactions
 // - /api/v1/dashboard/upcoming-due-loans
 // - /api/v1/dashboard/recent-activity
 // Using mock data until the backend endpoints are implemented
+
+// Mock data for dashboard stats
+const mockDashboardStats: DashboardStats = {
+  total_items: 265,
+  active_loans: 145,
+  total_revenue: 58900,
+  total_customers: 320,
+  total_branches: 4,
+  total_transactions: 450,
+  total_users: 15,
+  total_employees: 25,
+  revenue_by_day: Array.from({ length: 30 }, (_, i) => ({
+    date: dayjs().subtract(29 - i, 'day').format('YYYY-MM-DD'),
+    value: Math.floor(Math.random() * 5000) + 1000
+  }))
+};
 const mockBranchPerformance: BranchPerformance[] = [
   { name: 'Main Branch', loans: 145, revenue: 28500, items: 210 },
   { name: 'Downtown', loans: 98, revenue: 19200, items: 156 },
@@ -90,17 +106,12 @@ export const useDashboardData = (filters: FilterState): DashboardDataHookResult 
     }
   }, [wsError]);
 
-  // Fetch dashboard stats (fallback if WebSocket is not connected)
+  // Use mock data for dashboard stats instead of API call
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats', dateRange[0].format('YYYY-MM-DD'), dateRange[1].format('YYYY-MM-DD')],
     queryFn: async () => {
-      const response = await apiClient.get('/dashboard/stats', {
-        params: {
-          start_date: dateRange[0].format('YYYY-MM-DD'),
-          end_date: dateRange[1].format('YYYY-MM-DD')
-        }
-      });
-      return response.data;
+      // Return mock data instead of making API call
+      return mockDashboardStats;
     },
     enabled: !isConnected, // Only run if WebSocket is not connected
     refetchInterval: isConnected ? false : 30000, // Only poll if WebSocket is not connected
