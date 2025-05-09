@@ -6,8 +6,11 @@ from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.core.config import settings
+from app.database import get_async_db
 
 
 # Setup password hashing context
@@ -102,7 +105,7 @@ async def get_token_from_cookie_or_header(request: Request):
 
 async def get_current_user_with_cookie(
     request: Request,
-    
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     Validate token and get current user (supports both header and cookie auth)
@@ -128,7 +131,9 @@ async def get_current_user_with_cookie(
 
     from app.models.users import User  # Import here to avoid circular imports
 
-    user = db.query(User).filter(User.username == username).first()
+    result = await db.execute(select(User).where(User.username == username))
+    user = result.scalar_one_or_none()
+
     if user is None:
         raise credentials_exception
     if not user.is_active:

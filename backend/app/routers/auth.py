@@ -20,17 +20,19 @@ from app.auth.permissions import ROLE_PERMISSIONS
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-def authenticate_user(db: AsyncSession, username_or_email: str, password: str) -> User:
+async def authenticate_user(db: AsyncSession, username_or_email: str, password: str) -> User | None:
     """Authenticates a user by username or email and password"""
     # Try to find user by username
-    user = db.query(User).filter(User.username == username_or_email).first()
+    result = await db.execute(select(User).where(User.username == username_or_email))
+    user = result.scalar_one_or_none()
 
     # If not found by username, try email
     if not user:
-        user = db.query(User).filter(User.email == username_or_email).first()
+        result = await db.execute(select(User).where(User.email == username_or_email))
+        user = result.scalar_one_or_none()
 
     # If user not found or password doesn't match, return None
-    if not user or not user.verify_password(password):
+    if not user or not user.verify_password(password): # verify_password should be okay if it's CPU bound
         return None
 
     return user
@@ -109,15 +111,18 @@ async def login(
 
 
 @router.post("/login", response_model=Token)
-def login_for_access_token(
+async def login_for_access_token(
     response: Response,
     db: AsyncSession = Depends(get_async_db),
-    login_data: Login = None
+    login_data: Login = None # Consider making Login a Pydantic model for request body
 ) -> Any:
     """
     Login for regular API clients
     """
-    user = authenticate_user(db, login_data.email, login_data.password)
+    if not login_data: # Basic validation
+        raise HTTPException(status_code=400, detail="Login data not provided")
+
+    user = await authenticate_user(db, login_data.email, login_data.password) # Await the async function
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -143,7 +148,7 @@ def login_for_access_token(
 
 
 @router.post("/register", response_model=UserResponse)
-def register_new_user(
+async def register_new_user(
     user_in: UserCreate,
     db: AsyncSession = Depends(get_async_db)
 ) -> Any:
@@ -151,7 +156,8 @@ def register_new_user(
     Create new user
     """
     # Check if user with this email exists
-    user = db.query(User).filter(User.email == user_in.email).first()
+    result = await db.execute(select(User).where(User.email == user_in.email))
+    user = result.scalar_one_or_none()
     if user:
         raise HTTPException(
             status_code=400,
@@ -159,7 +165,8 @@ def register_new_user(
         )
 
     # Check if username is taken
-    user = db.query(User).filter(User.username == user_in.username).first()
+    result = await db.execute(select(User).where(User.username == user_in.username))
+    user = result.scalar_one_or_none()
     if user:
         raise HTTPException(
             status_code=400,
@@ -167,7 +174,8 @@ def register_new_user(
         )
 
     # Check if the role exists
-    role = db.query(Role).filter(Role.id == user_in.role_id).first()
+    result = await db.execute(select(Role).where(Role.id == user_in.role_id))
+    role = result.scalar_one_or_none()
     if not role:
         raise HTTPException(
             status_code=400,
@@ -179,25 +187,26 @@ def register_new_user(
         email=user_in.email,
         username=user_in.username,
         is_active=True,
-        is_superuser=False,
+        is_superuser=False, # Default to False for new registrations
         role_id=user_in.role_id
     )
-    db_user.set_password(user_in.password)
+    db_user.set_password(user_in.password) # set_password should be CPU bound
     db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
+    await db.commit()
+    await db.refresh(db_user)
     return db_user
 
 
 @router.post("/password-reset", response_model=dict)
-def reset_password(
+async def reset_password(
     email_in: PasswordReset,
     db: AsyncSession = Depends(get_async_db)
 ) -> Any:
     """
     Password recovery
     """
-    user = db.query(User).filter(User.email == email_in.email).first()
+    result = await db.execute(select(User).where(User.email == email_in.email))
+    user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(
             status_code=404,
@@ -210,24 +219,25 @@ def reset_password(
 
 
 @router.post("/change-password", response_model=dict)
-def change_password(
+async def change_password(
     password_data: PasswordChange,
     request: Request,
     db: AsyncSession = Depends(get_async_db),
-    current_user = Depends(get_current_user_with_cookie)
+    current_user: User = Depends(get_current_user_with_cookie) # Assuming get_current_user_with_cookie is async or compatible
 ) -> Any:
     """
     Change user password
     """
+    # verify_password should be CPU bound
     if not current_user.verify_password(password_data.current_password):
         raise HTTPException(
             status_code=400,
             detail="Incorrect current password"
         )
 
-    current_user.set_password(password_data.new_password)
+    current_user.set_password(password_data.new_password) # set_password should be CPU bound
     db.add(current_user)
-    db.commit()
+    await db.commit()
 
     return {"message": "Password updated successfully"}
 

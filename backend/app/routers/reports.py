@@ -1,16 +1,16 @@
-from select import select
 from typing import List, Optional, Dict, Any, Union
 from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Body, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func, extract, and_, or_, desc, column, literal
+from sqlalchemy import func, extract, and_, or_, desc, column, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from io import StringIO
 import csv
 import json
 from pydantic import BaseModel, Field
 import uuid
+import enum
 
 from app.database import get_async_db
 from app.models.users import User
@@ -854,19 +854,19 @@ async def get_branch_performance(
     performance = []
     for branch in branches:
         # Get branch metrics
-        loans_query = select(func.count(Loan.id)).where(Loan.branch_id == branch.id)
-        revenue_query = select(func.sum(Payment.amount)).join(Loan).where(Loan.branch_id == branch.id)
+        loans_query = select(func.count(Loan.id)).join(Item, Loan.item_id == Item.id).where(Item.branch_id == branch.id)
+        revenue_query = select(func.sum(Payment.amount)).join(Loan, Payment.loan_id == Loan.id).join(Item, Loan.item_id == Item.id).where(Item.branch_id == branch.id)
         items_query = select(func.count(Item.id)).where(Item.branch_id == branch.id)
 
-        loans_count = await db.execute(loans_query)
-        revenue = await db.execute(revenue_query)
-        items_count = await db.execute(items_query)
+        loans_count_result = await db.execute(loans_query)
+        revenue_result = await db.execute(revenue_query)
+        items_count_result = await db.execute(items_query)
 
         performance.append(BranchPerformance(
             name=branch.name,
-            loans=loans_count.scalar() or 0,
-            revenue=float(revenue.scalar() or 0),
-            items=items_count.scalar() or 0
+            loans=loans_count_result.scalar() or 0,
+            revenue=float(revenue_result.scalar() or 0),
+            items=items_count_result.scalar() or 0
         ))
 
     return performance
@@ -894,9 +894,9 @@ async def get_inventory_status(
 
     return [
         InventoryStatus(
-            name=status,
+            name=status.value if isinstance(status, enum.Enum) else str(status),
             value=count,
-            color=colors.get(status, "#9E9E9E")
+            color=colors.get(status.value if isinstance(status, enum.Enum) else str(status), "#9E9E9E")
         )
         for status, count in status_counts
     ]

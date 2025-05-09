@@ -15,6 +15,7 @@ class ItemStatus(enum.Enum):
     SOLD = "sold"
     DAMAGED = "damaged"
     LOST = "lost"
+    EXPIRED = "expired"
 
 
 class ItemCategory(enum.Enum):

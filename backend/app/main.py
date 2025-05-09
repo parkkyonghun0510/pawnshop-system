@@ -168,10 +168,33 @@ async def logout(response: Response):
 @app.websocket("/ws/dashboard")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time dashboard updates"""
-    await dashboard_manager.connect(websocket)
+    print("DEBUG: WebSocket endpoint hit, attempting to connect...")
     try:
-        while True:
-            # Keep the connection alive
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        dashboard_manager.disconnect(websocket)
+        await dashboard_manager.connect(websocket)
+        print(f"DEBUG: dashboard_manager.connect completed for client: {websocket.client}")
+        try:
+            while True:
+                # Keep the connection alive by waiting for messages (or ping/pong)
+                data = await websocket.receive_text() 
+                print(f"DEBUG: Received text from WebSocket: {data} from {websocket.client}") # Optional: log received data
+        except WebSocketDisconnect:
+            print(f"DEBUG: WebSocket disconnected: {websocket.client}")
+            dashboard_manager.disconnect(websocket)
+        except Exception as e_ws_loop:
+            print(f"DEBUG: Error in WebSocket receive loop for {websocket.client}: {e_ws_loop}")
+            # Consider disconnecting if an unexpected error occurs in the loop
+            # await dashboard_manager.disconnect(websocket)
+            # Depending on the error, you might want to close the websocket explicitly here
+            # if websocket.client_state == WebSocketState.CONNECTED:
+            #     await websocket.close(code=1011) 
+    except Exception as e_connect:
+        print(f"DEBUG: Error during dashboard_manager.connect or initial setup for {websocket.client}: {e_connect}")
+        # Ensure the websocket is closed if connect failed. 
+        # FastAPI might handle this, but being explicit can be safer.
+        # if websocket.client_state != WebSocketState.DISCONNECTED:
+        #     try:
+        #         await websocket.close(code=1011) # 1011 indicates an internal server error
+        #     except RuntimeError: # If already closed or in an invalid state
+        #         pass 
+        # It's often good to re-raise e_connect if Uvicorn should see it, 
+        # but for debugging, just printing might be enough initially.

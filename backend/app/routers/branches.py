@@ -20,7 +20,6 @@ async def read_branches(
     """Get list of branches"""
     result = await db.execute(select(Branch).offset(skip).limit(limit))
     branches = result.scalars().all()
-    branches = db.query(Branch).offset(skip).limit(limit).all()
     return branches
 
 @router.get("/{branch_id}", response_model=BranchResponse)

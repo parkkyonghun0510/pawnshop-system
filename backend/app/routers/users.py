@@ -2,6 +2,7 @@ from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.database import get_async_db
 from app.models.users import User, Role, Permission
@@ -324,7 +325,7 @@ async def delete_role(
 # --- Permission Routes ---
 
 @router.get("/permissions/", response_model=List[PermissionSchema])
-def read_permissions(
+async def read_permissions(
     db: AsyncSession = Depends(get_async_db),
     skip: int = 0,
     limit: int = 100,
@@ -333,7 +334,8 @@ def read_permissions(
     """
     Retrieve permissions.
     """
-    permissions = db.query(Permission).offset(skip).limit(limit).all()
+    result = await db.execute(select(Permission).offset(skip).limit(limit))
+    permissions = result.scalars().all()
     return permissions
 
 
