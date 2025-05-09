@@ -6,6 +6,8 @@ const API_URL = import.meta.env.VITE_APP_API_URL || 'http://localhost:8000';
 const API_VERSION = import.meta.env.VITE_APP_API_VERSION || 'v1';
 const API_BASE_URL = `${API_URL}/api/${API_VERSION}`;
 
+console.log('API Base URL:', API_BASE_URL);
+
 // Rate limiting configuration
 const RATE_LIMIT = {
     maxRequests: 50,
@@ -54,16 +56,12 @@ apiClient.interceptors.request.use(
 
         // Get token from cookie
         const token = Cookies.get('access_token');
-        console.log('Token from cookie in interceptor:', token);
 
         // If token exists, add it to Authorization header
         if (token && config.headers) {
             // Make sure to handle the 'Bearer ' prefix correctly
             const authToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-            console.log('Setting Authorization header:', authToken);
             config.headers.Authorization = authToken;
-        } else {
-            console.log('No token found in cookie');
         }
 
         // Get CSRF token if it exists
@@ -92,6 +90,17 @@ apiClient.interceptors.response.use(
         if (csrfToken) {
             Cookies.set('csrf_token', csrfToken, { secure: true, sameSite: 'strict' });
         }
+
+        // If response includes a token, save it
+        if (response.data && response.data.access_token) {
+            const accessToken = response.data.access_token;
+            Cookies.set('access_token', `Bearer ${accessToken}`, {
+                path: '/',
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax'
+            });
+        }
+
         return response;
     },
     async (error: AxiosError) => {
@@ -103,6 +112,7 @@ apiClient.interceptors.response.use(
                 Cookies.remove('access_token', { path: '/' });
                 Cookies.remove('csrf_token', { path: '/' });
 
+                // Redirect to login page if not already there
                 if (window.location.pathname !== '/login') {
                     window.location.href = '/login';
                 }

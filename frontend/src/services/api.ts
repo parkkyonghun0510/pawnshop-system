@@ -1,81 +1,159 @@
-import axios from 'axios';
+import apiClient from '../api/client';
 
-// Create an axios instance with default configuration
-export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Request interceptor for adding token to requests
-api.interceptors.request.use(
-  (config) => {
-    // Get token from localStorage
-    const token = localStorage.getItem('accessToken');
-    
-    // If token exists, add it to request headers
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor for handling errors
-api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
-  async (error) => {
-    const originalRequest = error.config;
-    
-    // If error is 401 (Unauthorized) and not a retry
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-      
-      try {
-        // Try to refresh token
-        const refreshToken = localStorage.getItem('refreshToken');
-        
-        if (refreshToken) {
-          const response = await axios.post('/api/v1/auth/refresh', {
-            refresh_token: refreshToken,
-          });
-          
-          const { access_token } = response.data;
-          
-          // Update tokens in localStorage
-          localStorage.setItem('accessToken', access_token);
-          
-          // Update Authorization header
-          api.defaults.headers.common.Authorization = `Bearer ${access_token}`;
-          originalRequest.headers.Authorization = `Bearer ${access_token}`;
-          
-          // Retry original request
-          return api(originalRequest);
-        }
-      } catch (refreshError) {
-        // If refresh fails, clear tokens and redirect to login
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        
-        // Redirect to login page
-        window.location.href = '/login';
+/**
+ * Authentication Services
+ */
+export const authService = {
+  login: (username: string, password: string) => 
+    apiClient.post('/authentication/auth/token', 
+      new URLSearchParams({ username, password }).toString(), 
+      {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       }
-    }
+    ),
     
-    return Promise.reject(error);
-  }
-);
+  register: (userData: any) => 
+    apiClient.post('/authentication/auth/register', userData),
+    
+  resetPassword: (email: string) => 
+    apiClient.post('/authentication/auth/password-reset', { email }),
+    
+  changePassword: (oldPassword: string, newPassword: string) => 
+    apiClient.post('/authentication/auth/change-password', { old_password: oldPassword, new_password: newPassword }),
+    
+  getCurrentUser: () => 
+    apiClient.get('/authentication/auth/me'),
+    
+  logout: () => 
+    apiClient.post('/authentication/auth/logout', {}),
+    
+  verifyToken: () => 
+    apiClient.get('/authentication/auth/verify')
+};
 
-// API utility functions
+/**
+ * User Management Services
+ */
+export const userService = {
+  getUsers: (params?: any) => 
+    apiClient.get('/users', { params }),
+    
+  createUser: (userData: any) => 
+    apiClient.post('/users', userData),
+    
+  getUser: (id: string) => 
+    apiClient.get(`/users/${id}`),
+    
+  updateUser: (id: string, userData: any) => 
+    apiClient.put(`/users/${id}`, userData),
+    
+  deleteUser: (id: string) => 
+    apiClient.delete(`/users/${id}`)
+};
 
-// Function to handle API errors
+/**
+ * Branch Management Services
+ */
+export const branchService = {
+  getBranches: (params?: any) => 
+    apiClient.get('/branches', { params }),
+    
+  createBranch: (branchData: any) => 
+    apiClient.post('/branches', branchData),
+    
+  getBranch: (id: string) => 
+    apiClient.get(`/branches/${id}`),
+    
+  updateBranch: (id: string, branchData: any) => 
+    apiClient.put(`/branches/${id}`, branchData),
+    
+  deleteBranch: (id: string) => 
+    apiClient.delete(`/branches/${id}`)
+};
+
+/**
+ * Inventory Management Services
+ */
+export const inventoryService = {
+  getInventory: (params?: any) => 
+    apiClient.get('/inventory', { params }),
+    
+  addInventoryItem: (itemData: any) => 
+    apiClient.post('/inventory', itemData),
+    
+  getInventoryItem: (id: string) => 
+    apiClient.get(`/inventory/${id}`),
+    
+  updateInventoryItem: (id: string, itemData: any) => 
+    apiClient.put(`/inventory/${id}`, itemData),
+    
+  deleteInventoryItem: (id: string) => 
+    apiClient.delete(`/inventory/${id}`)
+};
+
+/**
+ * Loan Management Services
+ */
+export const loanService = {
+  getLoans: (params?: any) => 
+    apiClient.get('/loans', { params }),
+    
+  createLoan: (loanData: any) => 
+    apiClient.post('/loans', loanData),
+    
+  getLoan: (id: string) => 
+    apiClient.get(`/loans/${id}`),
+    
+  updateLoan: (id: string, loanData: any) => 
+    apiClient.put(`/loans/${id}`, loanData),
+    
+  deleteLoan: (id: string) => 
+    apiClient.delete(`/loans/${id}`)
+};
+
+/**
+ * Transaction Management Services
+ */
+export const transactionService = {
+  getTransactions: (params?: any) => 
+    apiClient.get('/transactions', { params }),
+    
+  createTransaction: (transactionData: any) => 
+    apiClient.post('/transactions', transactionData),
+    
+  getTransaction: (id: string) => 
+    apiClient.get(`/transactions/${id}`)
+};
+
+/**
+ * Reporting Services
+ */
+export const reportService = {
+  getReports: (params?: any) => 
+    apiClient.get('/reports', { params }),
+    
+  generateReport: (reportData: any) => 
+    apiClient.post('/reports/generate', reportData),
+    
+  downloadReport: (id: string) => 
+    apiClient.get(`/reports/${id}/download`, { responseType: 'blob' })
+};
+
+/**
+ * Dashboard Services
+ */
+export const dashboardService = {
+  getInventoryStatus: () => 
+    apiClient.get('/dashboard/inventory-status'),
+    
+  getRecentTransactions: () => 
+    apiClient.get('/dashboard/recent-transactions'),
+    
+  getUpcomingDueLoans: () => 
+    apiClient.get('/dashboard/upcoming-due-loans')
+};
+
+// Helper function to handle API errors
 export const handleApiError = (error: any): string => {
   if (error.response) {
     // Server responded with a status other than 2xx

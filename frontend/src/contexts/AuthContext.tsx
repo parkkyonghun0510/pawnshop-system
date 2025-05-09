@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../api/client';
 import Cookies from 'js-cookie';
+import { authService } from '../services/api';
 
 // Types
 interface Permission {
@@ -69,21 +69,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Function to fetch the user profile
     const fetchUserProfile = async () => {
         try {
-            console.log('Fetching user profile...');
-            console.log('Cookie value:', Cookies.get('access_token'));
-
-            // Get all cookies for debugging
-            const allCookies = Cookies.get();
-            console.log('All cookies:', allCookies);
-
-            const response = await api.get('authentication/auth/me', {
-                withCredentials: true,
-                headers: {
-                    // Explicitly set the Authorization header with the cookie value
-                    'Authorization': `Bearer ${Cookies.get('access_token')?.replace('Bearer ', '')}`
-                }
-            });
-            console.log('User profile response:', response.data);
+            const response = await authService.getCurrentUser();
             setUser(response.data);
             return true;
         } catch (err) {
@@ -130,41 +116,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setError(null);
 
         try {
-            console.log('Attempting login with email:', email);
-
             // Use the authService to login
-            const response = await api.post('authentication/auth/token',
-                new URLSearchParams({
-                    'username': email, // OAuth2 spec uses 'username' even for email
-                    'password': password
-                }).toString(),
-                {
-                    withCredentials: true,
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    }
-                }
-            );
-
-            console.log('Login response:', response);
-
-            // Check if the cookie was set
-            console.log('Cookie after login:', Cookies.get('access_token'));
-
-            // Get all cookies for debugging
-            const allCookies = Cookies.get();
-            console.log('All cookies after login:', allCookies);
+            const response = await authService.login(email, password);
 
             if (response.status === 200) {
-                // Add a small delay to ensure cookie is set
-                await new Promise(resolve => setTimeout(resolve, 500));
-
-                // Check cookies again after delay
-                console.log('Cookie after delay:', Cookies.get('access_token'));
-
                 // If cookie is not set, manually set it
                 if (!Cookies.get('access_token') && response.data.access_token) {
-                    console.log('Manually setting cookie with token:', response.data.access_token);
                     Cookies.set('access_token', `Bearer ${response.data.access_token}`, {
                         path: '/',
                         sameSite: 'lax'
@@ -186,7 +143,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Logout function
     const logout = async () => {
         try {
-            await api.post('authentication/auth/logout', {}, { withCredentials: true });
+            await authService.logout();
         } catch (err) {
             console.error('Logout error:', err);
         }

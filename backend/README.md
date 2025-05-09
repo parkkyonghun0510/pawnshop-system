@@ -108,13 +108,13 @@ The database schema includes the following main tables:
 ## Updated API Documentation
 
 ### Authentication Endpoints
-- **POST** `/api/v1/authentication/token`: Obtain an access token for authentication.
-- **POST** `/api/v1/authentication/register`: Register a new user.
-- **POST** `/api/v1/authentication/password-reset`: Request a password reset.
-- **POST** `/api/v1/authentication/change-password`: Change the current user's password.
-- **GET** `/api/v1/authentication/me`: Retrieve the current user's information.
-- **POST** `/api/v1/authentication/logout`: Log out the current user.
-- **GET** `/api/v1/authentication/verify`: Verify the current user's token.
+- **POST** `/api/v1/authentication/auth/token`: Obtain an access token for authentication.
+- **POST** `/api/v1/authentication/auth/register`: Register a new user.
+- **POST** `/api/v1/authentication/auth/password-reset`: Request a password reset.
+- **POST** `/api/v1/authentication/auth/change-password`: Change the current user's password.
+- **GET** `/api/v1/authentication/auth/me`: Retrieve the current user's information.
+- **POST** `/api/v1/authentication/auth/logout`: Log out the current user.
+- **GET** `/api/v1/authentication/auth/verify`: Verify the current user's token.
 
 ### User Management Endpoints
 - **GET** `/api/v1/users`: Retrieve a list of users.
