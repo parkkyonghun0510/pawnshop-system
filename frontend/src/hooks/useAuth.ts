@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { jwtDecode } from 'jwt-decode';
-import { api } from '../services/api';
+import apiClient from '../api/client';
 
 // Define types for our JWT token and user
 interface JwtPayload {
@@ -59,10 +59,10 @@ export const useAuth = (): AuthState => {
 
     try {
       // Set auth header for future requests
-      api.defaults.headers.common.Authorization = `Bearer ${token}`;
+      apiClient.defaults.headers.common.Authorization = `Bearer ${token}`;
       
       // Fetch user data
-      const response = await api.get('/api/v1/users/me');
+      const response = await apiClient.get('/api/v1/users/me');
       setUser(response.data);
       setIsAuthenticated(true);
       setIsLoading(false);
@@ -80,11 +80,11 @@ export const useAuth = (): AuthState => {
   const login = async (email: string, password: string): Promise<void> => {
     setIsLoading(true);
     try {
-      const response = await api.post('/api/v1/auth/login', { email, password });
+      const response = await apiClient.post('/api/v1/auth/login', { email, password });
       const { access_token } = response.data;
       
       localStorage.setItem('accessToken', access_token);
-      api.defaults.headers.common.Authorization = `Bearer ${access_token}`;
+      apiClient.defaults.headers.common.Authorization = `Bearer ${access_token}`;
       
       await checkAuth();
     } catch (error) {
@@ -99,7 +99,7 @@ export const useAuth = (): AuthState => {
   // Logout function
   const logout = (): void => {
     localStorage.removeItem('accessToken');
-    delete api.defaults.headers.common.Authorization;
+    delete apiClient.defaults.headers.common.Authorization;
     setIsAuthenticated(false);
     setUser(null);
   };
