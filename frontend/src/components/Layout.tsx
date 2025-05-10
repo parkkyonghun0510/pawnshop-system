@@ -21,6 +21,9 @@ import {
   Person as PersonIcon,
   Assignment as AssignmentIcon,
   Logout as LogoutIcon,
+  AdminPanelSettings as RolesIcon,
+  VpnKey as PermissionsIcon,
+  History as AuditLogIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -48,6 +51,9 @@ export default function Layout({ children }: LayoutProps) {
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
     { text: 'Users', icon: <PeopleIcon />, path: '/users' },
+    { text: 'Roles', icon: <RolesIcon />, path: '/roles' },
+    { text: 'Permissions', icon: <PermissionsIcon />, path: '/permissions' },
+    { text: 'Audit Logs', icon: <AuditLogIcon />, path: '/audit-logs' },
     { text: 'Branches', icon: <StoreIcon />, path: '/branches' },
     { text: 'Employees', icon: <PersonIcon />, path: '/employees' },
     { text: 'Applications', icon: <AssignmentIcon />, path: '/applications' },
@@ -151,4 +157,4 @@ export default function Layout({ children }: LayoutProps) {
       </Box>
     </Box>
   );
-} 
+}

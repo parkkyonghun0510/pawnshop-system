@@ -28,14 +28,21 @@ import {
   TablePagination,
   TableSortLabel,
   InputAdornment,
+  Checkbox,
+  Tooltip,
+  Chip,
+  Divider,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   Search as SearchIcon,
+  Group as GroupIcon,
+  PersonAdd as PersonAddIcon,
 } from '@mui/icons-material';
 import apiClient from '../api/client';
+import { rolesService } from '../api/services';
 
 interface User {
   id: number;
@@ -66,6 +73,7 @@ type OrderBy = 'username' | 'email' | 'role' | 'status';
 
 export default function UsersPage() {
   const [openDialog, setOpenDialog] = useState(false);
+  const [openBulkRoleDialog, setOpenBulkRoleDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<UserFormData>({
     username: '',
@@ -81,6 +89,8 @@ export default function UsersPage() {
   const [orderBy, setOrderBy] = useState<OrderBy>('username');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState<number | 'all'>('all');
+  const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
+  const [bulkRoleId, setBulkRoleId] = useState<number>(0);
   const queryClient = useQueryClient();
 
   // Fetch users
@@ -96,7 +106,7 @@ export default function UsersPage() {
   const { data: roles, isLoading: rolesLoading } = useQuery<Role[]>({
     queryKey: ['roles'],
     queryFn: async () => {
-      const response = await apiClient.get('/roles');
+      const response = await rolesService.getRoles();
       return response.data;
     },
   });
@@ -113,6 +123,22 @@ export default function UsersPage() {
     },
     onError: (error: any) => {
       setError(error.response?.data?.detail || 'Failed to create user');
+    },
+  });
+
+  // Bulk update role mutation
+  const bulkUpdateRoleMutation = useMutation({
+    mutationFn: async ({ userIds, roleId }: { userIds: number[], roleId: number }) => {
+      const response = await apiClient.post('/users/bulk-update-role', { user_ids: userIds, role_id: roleId });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      handleCloseBulkRoleDialog();
+      setSelectedUsers([]);
+    },
+    onError: (error: any) => {
+      setError(error.response?.data?.detail || 'Failed to update roles');
     },
   });
 
@@ -195,6 +221,52 @@ export default function UsersPage() {
     }
   };
 
+  // Bulk role assignment
+  const handleOpenBulkRoleDialog = () => {
+    if (selectedUsers.length === 0) {
+      setError('Please select at least one user');
+      return;
+    }
+    setOpenBulkRoleDialog(true);
+  };
+
+  const handleCloseBulkRoleDialog = () => {
+    setOpenBulkRoleDialog(false);
+    setBulkRoleId(0);
+    setError(null);
+  };
+
+  const handleBulkRoleAssignment = () => {
+    if (bulkRoleId === 0) {
+      setError('Please select a role');
+      return;
+    }
+
+    // Call API to update roles for selected users
+    bulkUpdateRoleMutation.mutate({
+      userIds: selectedUsers,
+      roleId: bulkRoleId
+    });
+  };
+
+  const handleSelectUser = (id: number) => {
+    setSelectedUsers(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(userId => userId !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
+  };
+
+  const handleSelectAllUsers = () => {
+    if (filteredUsers.length === selectedUsers.length) {
+      setSelectedUsers([]);
+    } else {
+      setSelectedUsers(filteredUsers.map(user => user.id));
+    }
+  };
+
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);
   };
@@ -242,7 +314,7 @@ export default function UsersPage() {
 
   const filterData = (data: User[]) => {
     return data.filter((user) => {
-      const matchesSearch = searchTerm === '' || 
+      const matchesSearch = searchTerm === '' ||
         user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.role.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -272,13 +344,24 @@ export default function UsersPage() {
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4">Users</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-        >
-          Add User
-        </Button>
+        <Box display="flex" gap={2}>
+          {selectedUsers.length > 0 && (
+            <Button
+              variant="outlined"
+              startIcon={<GroupIcon />}
+              onClick={handleOpenBulkRoleDialog}
+            >
+              Assign Role ({selectedUsers.length})
+            </Button>
+          )}
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog()}
+          >
+            Add User
+          </Button>
+        </Box>
       </Box>
 
       {error && (
@@ -321,6 +404,13 @@ export default function UsersPage() {
         <Table>
           <TableHead>
             <TableRow>
+              <TableCell padding="checkbox">
+                <Checkbox
+                  indeterminate={selectedUsers.length > 0 && selectedUsers.length < filteredUsers.length}
+                  checked={filteredUsers.length > 0 && selectedUsers.length === filteredUsers.length}
+                  onChange={handleSelectAllUsers}
+                />
+              </TableCell>
               <TableCell>
                 <TableSortLabel
                   active={orderBy === 'username'}
@@ -362,11 +452,34 @@ export default function UsersPage() {
           </TableHead>
           <TableBody>
             {paginatedUsers.map((user) => (
-              <TableRow key={user.id}>
+              <TableRow
+                key={user.id}
+                selected={selectedUsers.includes(user.id)}
+                hover
+              >
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    checked={selectedUsers.includes(user.id)}
+                    onChange={() => handleSelectUser(user.id)}
+                  />
+                </TableCell>
                 <TableCell>{user.username}</TableCell>
                 <TableCell>{user.email}</TableCell>
-                <TableCell>{user.role.name}</TableCell>
-                <TableCell>{user.is_active ? 'Active' : 'Inactive'}</TableCell>
+                <TableCell>
+                  <Chip
+                    label={user.role.name}
+                    color={user.role.name.toLowerCase() === 'admin' ? 'error' : 'primary'}
+                    variant="outlined"
+                    size="small"
+                  />
+                </TableCell>
+                <TableCell>
+                  <Chip
+                    label={user.is_active ? 'Active' : 'Inactive'}
+                    color={user.is_active ? 'success' : 'default'}
+                    size="small"
+                  />
+                </TableCell>
                 <TableCell>
                   <IconButton onClick={() => handleOpenDialog(user)}>
                     <EditIcon />
@@ -454,6 +567,51 @@ export default function UsersPage() {
           </DialogActions>
         </form>
       </Dialog>
+
+      {/* Bulk Role Assignment Dialog */}
+      <Dialog open={openBulkRoleDialog} onClose={handleCloseBulkRoleDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Assign Role to Multiple Users</DialogTitle>
+        <DialogContent>
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
+          <Box mt={2}>
+            <Typography variant="body2" color="textSecondary" gutterBottom>
+              You are about to change the role for {selectedUsers.length} users.
+            </Typography>
+
+            <FormControl fullWidth sx={{ mt: 2 }}>
+              <InputLabel>Select Role</InputLabel>
+              <Select
+                value={bulkRoleId}
+                label="Select Role"
+                onChange={(e) => setBulkRoleId(Number(e.target.value))}
+                required
+              >
+                <MenuItem value={0} disabled>Select a role</MenuItem>
+                {roles?.map((role) => (
+                  <MenuItem key={role.id} value={role.id}>
+                    {role.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseBulkRoleDialog}>Cancel</Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleBulkRoleAssignment}
+            disabled={bulkRoleId === 0}
+          >
+            Assign Role
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
-} 
+}

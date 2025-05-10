@@ -11,6 +11,9 @@ import ReportsPage from './pages/ReportsPage';
 import BranchesPage from './pages/BranchesPage';
 import EmployeesPage from './pages/EmployeesPage';
 import AppPortalPage from './pages/AppPortalPage';
+import RolesPage from './pages/RolesPage';
+import PermissionsPage from './pages/PermissionsPage';
+import AuditLogPage from './pages/AuditLogPage';
 
 const App = () => {
     return (
@@ -119,6 +122,42 @@ const App = () => {
                         requireAll={false}
                     >
                         <EmployeesPage />
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/roles"
+                element={
+                    <ProtectedRoute
+                        requiredPermissions={['manage_roles', 'manage_permissions']}
+                        requireAll={false}
+                    >
+                        <RolesPage />
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/permissions"
+                element={
+                    <ProtectedRoute
+                        requiredPermissions={['manage_permissions']}
+                        requireAll={true}
+                    >
+                        <PermissionsPage />
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/audit-logs"
+                element={
+                    <ProtectedRoute
+                        requiredPermissions={['view_audit_logs']}
+                        requireAll={true}
+                    >
+                        <AuditLogPage />
                     </ProtectedRoute>
                 }
             />

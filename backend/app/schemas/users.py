@@ -122,3 +122,9 @@ class Permission(PermissionBase):
     updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class BulkRoleUpdate(BaseModel):
+    """Schema for bulk role update"""
+    user_ids: List[int]
+    role_id: int

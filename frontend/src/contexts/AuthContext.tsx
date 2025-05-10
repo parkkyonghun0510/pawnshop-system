@@ -38,6 +38,8 @@ interface AuthContextType {
     hasPermission: (permission: string) => boolean;
     hasAnyPermission: (permissions: string[]) => boolean;
     hasAllPermissions: (permissions: string[]) => boolean;
+    hasRole: (role: string) => boolean;
+    isAdmin: () => boolean;
 }
 
 // Create the context
@@ -52,17 +54,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const isAuthenticated = !!user;
 
-    // Permission checking functions
+    // Role and permission checking functions
+    const hasRole = (role: string): boolean => {
+        if (!user || !user.role) return false;
+        return user.role.name.toLowerCase() === role.toLowerCase();
+    };
+
+    const isAdmin = (): boolean => {
+        return user?.is_superuser || hasRole('admin');
+    };
+
     const hasPermission = (permission: string): boolean => {
+        // Superusers and admins have all permissions
+        if (isAdmin()) return true;
+
         if (!user || !user.role || !user.role.permissions) return false;
         return user.role.permissions.some(p => p.value === permission);
     };
 
     const hasAnyPermission = (permissions: string[]): boolean => {
+        // Superusers and admins have all permissions
+        if (isAdmin()) return true;
+
         return permissions.some(permission => hasPermission(permission));
     };
 
     const hasAllPermissions = (permissions: string[]): boolean => {
+        // Superusers and admins have all permissions
+        if (isAdmin()) return true;
+
         return permissions.every(permission => hasPermission(permission));
     };
 
@@ -163,6 +183,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         hasPermission,
         hasAnyPermission,
         hasAllPermissions,
+        hasRole,
+        isAdmin,
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

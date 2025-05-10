@@ -9,7 +9,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import Base, engine, get_async_db
-from app.routers import users, branches, employees, customers, transactions, loans, auth, collaterals, payments, applications, reports
+from app.routers import users, branches, employees, customers, transactions, loans, auth, collaterals, payments, applications, reports, audit
 from app.models.users import User, Role
 from app.core.config import settings
 from app.core.security import create_access_token, verify_password, get_current_user_with_cookie
@@ -49,6 +49,7 @@ app.include_router(collaterals.router, prefix=f"{api_prefix}/collaterals", tags=
 app.include_router(payments.router, prefix=f"{api_prefix}/payments", tags=["payments"])
 app.include_router(applications.router, prefix=f"{api_prefix}/applications", tags=["applications"])
 app.include_router(reports.router, prefix=f"{api_prefix}/dashboard", tags=["reports"])
+app.include_router(audit.router, prefix=f"{api_prefix}/audit", tags=["audit"])
 
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
@@ -175,7 +176,7 @@ async def websocket_endpoint(websocket: WebSocket):
         try:
             while True:
                 # Keep the connection alive by waiting for messages (or ping/pong)
-                data = await websocket.receive_text() 
+                data = await websocket.receive_text()
                 print(f"DEBUG: Received text from WebSocket: {data} from {websocket.client}") # Optional: log received data
         except WebSocketDisconnect:
             print(f"DEBUG: WebSocket disconnected: {websocket.client}")
@@ -186,15 +187,15 @@ async def websocket_endpoint(websocket: WebSocket):
             # await dashboard_manager.disconnect(websocket)
             # Depending on the error, you might want to close the websocket explicitly here
             # if websocket.client_state == WebSocketState.CONNECTED:
-            #     await websocket.close(code=1011) 
+            #     await websocket.close(code=1011)
     except Exception as e_connect:
         print(f"DEBUG: Error during dashboard_manager.connect or initial setup for {websocket.client}: {e_connect}")
-        # Ensure the websocket is closed if connect failed. 
+        # Ensure the websocket is closed if connect failed.
         # FastAPI might handle this, but being explicit can be safer.
         # if websocket.client_state != WebSocketState.DISCONNECTED:
         #     try:
         #         await websocket.close(code=1011) # 1011 indicates an internal server error
         #     except RuntimeError: # If already closed or in an invalid state
-        #         pass 
-        # It's often good to re-raise e_connect if Uvicorn should see it, 
+        #         pass
+        # It's often good to re-raise e_connect if Uvicorn should see it,
         # but for debugging, just printing might be enough initially.

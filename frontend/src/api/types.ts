@@ -11,12 +11,30 @@ export interface LoginCredentials {
     password: string;
 }
 
+export interface Permission {
+    id: number;
+    name: string;
+    description?: string;
+    value: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface Role extends BaseEntity {
+    name: string;
+    description?: string;
+    permissions: Permission[];
+}
+
 export interface User extends BaseEntity {
     username: string;
     email: string;
-    role: string;
+    first_name?: string;
+    last_name?: string;
+    role_id: number;
+    role: Role;
     is_active: boolean;
-    permissions?: string[];
+    is_superuser?: boolean;
 }
 
 // Customer Types
@@ -113,4 +131,4 @@ export interface ApiResponse<T> {
     data: T;
     message?: string;
     errors?: any;
-} 
+}
