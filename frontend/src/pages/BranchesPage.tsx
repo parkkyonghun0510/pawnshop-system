@@ -24,14 +24,18 @@ import {
   TablePagination,
   TableSortLabel,
   InputAdornment,
+  Chip,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   Search as SearchIcon,
+  Store as StoreIcon,
+  Home as HomeIcon,
 } from '@mui/icons-material';
 import apiClient from '../api/client';
+import { PageContainer, ContentSection } from '../components/ui';
 
 interface Branch {
   id: number;
@@ -223,21 +227,13 @@ export default function BranchesPage() {
 
   const filterData = (data: Branch[]) => {
     return data.filter((branch) => {
-      return searchTerm === '' || 
+      return searchTerm === '' ||
         branch.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         branch.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
         branch.phone.toLowerCase().includes(searchTerm.toLowerCase()) ||
         branch.email.toLowerCase().includes(searchTerm.toLowerCase());
     });
   };
-
-  if (branchesLoading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
-    );
-  }
 
   const filteredBranches = filterData(branches || []);
   const sortedBranches = sortData([...filteredBranches]);
@@ -247,121 +243,146 @@ export default function BranchesPage() {
   );
 
   return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">Branches</Typography>
+    <PageContainer
+      title="Branches"
+      subtitle="Manage your pawnshop branch locations"
+      breadcrumbs={[
+        { label: 'Home', path: '/', icon: <HomeIcon sx={{ mr: 0.5 }} fontSize="small" /> },
+        { label: 'Branch Management' },
+        { label: 'Branches' },
+      ]}
+      actions={
         <Button
           variant="contained"
+          color="primary"
           startIcon={<AddIcon />}
           onClick={() => handleOpenDialog()}
         >
           Add Branch
         </Button>
-      </Box>
-
+      }
+      loading={branchesLoading}
+      refreshable
+      onRefresh={() => queryClient.invalidateQueries({ queryKey: ['branches'] })}
+    >
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mb: 3 }}>
           {error}
         </Alert>
       )}
 
-      <Box display="flex" gap={2} mb={3}>
-        <TextField
-          placeholder="Search branches..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
-          }}
-        />
-      </Box>
+      <ContentSection
+        title="Branch Locations"
+        icon={<StoreIcon color="primary" />}
+        variant="paper"
+        elevation={1}
+      >
+        <Box mb={3}>
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="Search branches..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Box>
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>
-                <TableSortLabel
-                  active={orderBy === 'name'}
-                  direction={orderBy === 'name' ? order : 'asc'}
-                  onClick={() => handleRequestSort('name')}
-                >
-                  Name
-                </TableSortLabel>
-              </TableCell>
-              <TableCell>
-                <TableSortLabel
-                  active={orderBy === 'address'}
-                  direction={orderBy === 'address' ? order : 'asc'}
-                  onClick={() => handleRequestSort('address')}
-                >
-                  Address
-                </TableSortLabel>
-              </TableCell>
-              <TableCell>
-                <TableSortLabel
-                  active={orderBy === 'phone'}
-                  direction={orderBy === 'phone' ? order : 'asc'}
-                  onClick={() => handleRequestSort('phone')}
-                >
-                  Phone
-                </TableSortLabel>
-              </TableCell>
-              <TableCell>
-                <TableSortLabel
-                  active={orderBy === 'email'}
-                  direction={orderBy === 'email' ? order : 'asc'}
-                  onClick={() => handleRequestSort('email')}
-                >
-                  Email
-                </TableSortLabel>
-              </TableCell>
-              <TableCell>
-                <TableSortLabel
-                  active={orderBy === 'status'}
-                  direction={orderBy === 'status' ? order : 'asc'}
-                  onClick={() => handleRequestSort('status')}
-                >
-                  Status
-                </TableSortLabel>
-              </TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {paginatedBranches.map((branch) => (
-              <TableRow key={branch.id}>
-                <TableCell>{branch.name}</TableCell>
-                <TableCell>{branch.address}</TableCell>
-                <TableCell>{branch.phone}</TableCell>
-                <TableCell>{branch.email}</TableCell>
-                <TableCell>{branch.is_active ? 'Active' : 'Inactive'}</TableCell>
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
                 <TableCell>
-                  <IconButton onClick={() => handleOpenDialog(branch)}>
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton onClick={() => handleDelete(branch.id)}>
-                    <DeleteIcon />
-                  </IconButton>
+                  <TableSortLabel
+                    active={orderBy === 'name'}
+                    direction={orderBy === 'name' ? order : 'asc'}
+                    onClick={() => handleRequestSort('name')}
+                  >
+                    Name
+                  </TableSortLabel>
                 </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={orderBy === 'address'}
+                    direction={orderBy === 'address' ? order : 'asc'}
+                    onClick={() => handleRequestSort('address')}
+                  >
+                    Address
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={orderBy === 'phone'}
+                    direction={orderBy === 'phone' ? order : 'asc'}
+                    onClick={() => handleRequestSort('phone')}
+                  >
+                    Phone
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={orderBy === 'email'}
+                    direction={orderBy === 'email' ? order : 'asc'}
+                    onClick={() => handleRequestSort('email')}
+                  >
+                    Email
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={orderBy === 'status'}
+                    direction={orderBy === 'status' ? order : 'asc'}
+                    onClick={() => handleRequestSort('status')}
+                  >
+                    Status
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>Actions</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
-          component="div"
-          count={filteredBranches.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={handleChangePage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-        />
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {paginatedBranches.map((branch) => (
+                <TableRow key={branch.id}>
+                  <TableCell>{branch.name}</TableCell>
+                  <TableCell>{branch.address}</TableCell>
+                  <TableCell>{branch.phone}</TableCell>
+                  <TableCell>{branch.email}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={branch.is_active ? 'Active' : 'Inactive'}
+                      color={branch.is_active ? 'success' : 'default'}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <IconButton onClick={() => handleOpenDialog(branch)}>
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton onClick={() => handleDelete(branch.id)}>
+                      <DeleteIcon />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25]}
+            component="div"
+            count={filteredBranches.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+          />
+        </TableContainer>
+      </ContentSection>
 
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <DialogTitle>{selectedBranch ? 'Edit Branch' : 'Add Branch'}</DialogTitle>
@@ -421,6 +442,6 @@ export default function BranchesPage() {
           </DialogActions>
         </form>
       </Dialog>
-    </Box>
+    </PageContainer>
   );
-} 
+}

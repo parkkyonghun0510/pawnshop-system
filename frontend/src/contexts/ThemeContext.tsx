@@ -1,5 +1,6 @@
-import { createTheme, alpha } from '@mui/material/styles';
-import { PaletteMode } from '@mui/material';
+import React, { createContext, useState, useEffect, useMemo } from 'react';
+import { ThemeProvider as MuiThemeProvider, createTheme, alpha } from '@mui/material/styles';
+import { CssBaseline, PaletteMode } from '@mui/material';
 
 // Define color palette
 const primaryColor = {
@@ -17,7 +18,7 @@ const secondaryColor = {
 };
 
 // Create theme with color mode support
-const createAppTheme = (mode: PaletteMode = 'light') => {
+const createAppTheme = (mode: PaletteMode) => {
   return createTheme({
     palette: {
       mode,
@@ -155,33 +156,6 @@ const createAppTheme = (mode: PaletteMode = 'light') => {
     shape: {
       borderRadius: 8,
     },
-    shadows: [
-      'none',
-      '0px 2px 1px -1px rgba(0,0,0,0.05),0px 1px 1px 0px rgba(0,0,0,0.03),0px 1px 3px 0px rgba(0,0,0,0.05)',
-      '0px 3px 3px -2px rgba(0,0,0,0.05),0px 2px 6px 0px rgba(0,0,0,0.03),0px 1px 8px 0px rgba(0,0,0,0.05)',
-      '0px 3px 4px -2px rgba(0,0,0,0.06),0px 3px 8px 0px rgba(0,0,0,0.04),0px 1px 12px 0px rgba(0,0,0,0.06)',
-      '0px 4px 5px -2px rgba(0,0,0,0.06),0px 4px 10px 0px rgba(0,0,0,0.04),0px 1px 16px 0px rgba(0,0,0,0.06)',
-      '0px 5px 8px -3px rgba(0,0,0,0.07),0px 5px 12px 1px rgba(0,0,0,0.05),0px 3px 16px 2px rgba(0,0,0,0.07)',
-      '0px 6px 10px -4px rgba(0,0,0,0.07),0px 8px 16px 2px rgba(0,0,0,0.05),0px 4px 18px 3px rgba(0,0,0,0.07)',
-      '0px 7px 12px -4px rgba(0,0,0,0.07),0px 10px 18px 2px rgba(0,0,0,0.05),0px 5px 22px 4px rgba(0,0,0,0.07)',
-      '0px 8px 14px -5px rgba(0,0,0,0.07),0px 12px 20px 3px rgba(0,0,0,0.05),0px 6px 24px 5px rgba(0,0,0,0.07)',
-      '0px 9px 16px -6px rgba(0,0,0,0.07),0px 14px 22px 3px rgba(0,0,0,0.05),0px 7px 26px 6px rgba(0,0,0,0.07)',
-      '0px 10px 18px -6px rgba(0,0,0,0.07),0px 16px 24px 4px rgba(0,0,0,0.05),0px 8px 28px 7px rgba(0,0,0,0.07)',
-      '0px 11px 20px -7px rgba(0,0,0,0.07),0px 18px 26px 4px rgba(0,0,0,0.05),0px 9px 30px 8px rgba(0,0,0,0.07)',
-      '0px 12px 22px -8px rgba(0,0,0,0.07),0px 20px 28px 5px rgba(0,0,0,0.05),0px 10px 32px 9px rgba(0,0,0,0.07)',
-      '0px 13px 24px -8px rgba(0,0,0,0.07),0px 22px 30px 5px rgba(0,0,0,0.05),0px 11px 34px 10px rgba(0,0,0,0.07)',
-      '0px 14px 26px -9px rgba(0,0,0,0.07),0px 24px 32px 6px rgba(0,0,0,0.05),0px 12px 36px 11px rgba(0,0,0,0.07)',
-      '0px 15px 28px -10px rgba(0,0,0,0.07),0px 26px 34px 6px rgba(0,0,0,0.05),0px 13px 38px 12px rgba(0,0,0,0.07)',
-      '0px 16px 30px -10px rgba(0,0,0,0.07),0px 28px 36px 7px rgba(0,0,0,0.05),0px 14px 40px 13px rgba(0,0,0,0.07)',
-      '0px 17px 32px -11px rgba(0,0,0,0.07),0px 30px 38px 7px rgba(0,0,0,0.05),0px 15px 42px 14px rgba(0,0,0,0.07)',
-      '0px 18px 34px -12px rgba(0,0,0,0.07),0px 32px 40px 8px rgba(0,0,0,0.05),0px 16px 44px 15px rgba(0,0,0,0.07)',
-      '0px 19px 36px -12px rgba(0,0,0,0.07),0px 34px 42px 8px rgba(0,0,0,0.05),0px 17px 46px 16px rgba(0,0,0,0.07)',
-      '0px 20px 38px -13px rgba(0,0,0,0.07),0px 36px 44px 9px rgba(0,0,0,0.05),0px 18px 48px 17px rgba(0,0,0,0.07)',
-      '0px 21px 40px -14px rgba(0,0,0,0.07),0px 38px 46px 9px rgba(0,0,0,0.05),0px 19px 50px 18px rgba(0,0,0,0.07)',
-      '0px 22px 42px -14px rgba(0,0,0,0.07),0px 40px 48px 10px rgba(0,0,0,0.05),0px 20px 52px 19px rgba(0,0,0,0.07)',
-      '0px 23px 44px -15px rgba(0,0,0,0.07),0px 42px 50px 10px rgba(0,0,0,0.05),0px 21px 54px 20px rgba(0,0,0,0.07)',
-      '0px 24px 46px -16px rgba(0,0,0,0.07),0px 44px 52px 11px rgba(0,0,0,0.05),0px 22px 56px 21px rgba(0,0,0,0.07)',
-    ],
     components: {
       MuiCssBaseline: {
         styleOverrides: {
@@ -254,8 +228,8 @@ const createAppTheme = (mode: PaletteMode = 'light') => {
         styleOverrides: {
           root: {
             backgroundImage: 'none',
-            boxShadow: mode === 'light'
-              ? '0px 4px 12px rgba(0, 0, 0, 0.05)'
+            boxShadow: mode === 'light' 
+              ? '0px 4px 12px rgba(0, 0, 0, 0.05)' 
               : '0px 4px 12px rgba(0, 0, 0, 0.2)',
           },
           rounded: {
@@ -266,8 +240,8 @@ const createAppTheme = (mode: PaletteMode = 'light') => {
       MuiCard: {
         styleOverrides: {
           root: {
-            boxShadow: mode === 'light'
-              ? '0px 4px 12px rgba(0, 0, 0, 0.05)'
+            boxShadow: mode === 'light' 
+              ? '0px 4px 12px rgba(0, 0, 0, 0.05)' 
               : '0px 4px 12px rgba(0, 0, 0, 0.2)',
             borderRadius: 12,
             position: 'relative',
@@ -275,19 +249,9 @@ const createAppTheme = (mode: PaletteMode = 'light') => {
             transition: 'transform 0.3s ease, box-shadow 0.3s ease',
             '&:hover': {
               transform: 'translateY(-4px)',
-              boxShadow: mode === 'light'
-                ? '0px 12px 24px rgba(0, 0, 0, 0.1)'
+              boxShadow: mode === 'light' 
+                ? '0px 12px 24px rgba(0, 0, 0, 0.1)' 
                 : '0px 12px 24px rgba(0, 0, 0, 0.3)',
-            },
-          },
-        },
-      },
-      MuiCardContent: {
-        styleOverrides: {
-          root: {
-            padding: 24,
-            '&:last-child': {
-              paddingBottom: 24,
             },
           },
         },
@@ -295,8 +259,8 @@ const createAppTheme = (mode: PaletteMode = 'light') => {
       MuiAppBar: {
         styleOverrides: {
           root: {
-            boxShadow: mode === 'light'
-              ? '0px 2px 10px rgba(0, 0, 0, 0.1)'
+            boxShadow: mode === 'light' 
+              ? '0px 2px 10px rgba(0, 0, 0, 0.1)' 
               : '0px 2px 10px rgba(0, 0, 0, 0.3)',
             backgroundImage: 'none',
           },
@@ -309,43 +273,13 @@ const createAppTheme = (mode: PaletteMode = 'light') => {
       MuiTableHead: {
         styleOverrides: {
           root: {
-            backgroundColor: mode === 'light'
-              ? alpha(primaryColor.light, 0.1)
+            backgroundColor: mode === 'light' 
+              ? alpha(primaryColor.light, 0.1) 
               : alpha(primaryColor.dark, 0.2),
             '& .MuiTableCell-root': {
               color: mode === 'light' ? primaryColor.dark : primaryColor.light,
               fontWeight: 600,
             },
-          },
-        },
-      },
-      MuiTableRow: {
-        styleOverrides: {
-          root: {
-            '&:nth-of-type(odd)': {
-              backgroundColor: mode === 'light'
-                ? alpha('#f5f5f5', 0.5)
-                : alpha('#333333', 0.2),
-            },
-            '&:hover': {
-              backgroundColor: mode === 'light'
-                ? alpha(primaryColor.light, 0.1)
-                : alpha(primaryColor.dark, 0.1),
-            },
-          },
-        },
-      },
-      MuiTableCell: {
-        styleOverrides: {
-          root: {
-            borderBottom: mode === 'light'
-              ? '1px solid rgba(224, 224, 224, 1)'
-              : '1px solid rgba(81, 81, 81, 1)',
-            padding: '16px',
-          },
-          head: {
-            fontWeight: 600,
-            whiteSpace: 'nowrap',
           },
         },
       },
@@ -357,103 +291,72 @@ const createAppTheme = (mode: PaletteMode = 'light') => {
           },
         },
       },
-      MuiListItemButton: {
-        styleOverrides: {
-          root: {
-            borderRadius: 8,
-            margin: '4px 8px',
-            padding: '8px 16px',
-          },
-        },
-      },
-      MuiListItemIcon: {
-        styleOverrides: {
-          root: {
-            minWidth: 40,
-          },
-        },
-      },
-      MuiChip: {
-        styleOverrides: {
-          root: {
-            borderRadius: 16,
-            fontWeight: 500,
-          },
-          filled: {
-            '&.MuiChip-colorPrimary': {
-              backgroundColor: primaryColor.main,
-              color: primaryColor.contrastText,
-            },
-            '&.MuiChip-colorSecondary': {
-              backgroundColor: secondaryColor.main,
-              color: secondaryColor.contrastText,
-            },
-          },
-        },
-      },
-      MuiTextField: {
-        styleOverrides: {
-          root: {
-            '& .MuiOutlinedInput-root': {
-              borderRadius: 8,
-            },
-          },
-        },
-      },
-      MuiInputBase: {
-        styleOverrides: {
-          root: {
-            borderRadius: 8,
-          },
-        },
-      },
-      MuiOutlinedInput: {
-        styleOverrides: {
-          root: {
-            borderRadius: 8,
-          },
-          input: {
-            padding: '14px 16px',
-          },
-        },
-      },
-      MuiDialog: {
-        styleOverrides: {
-          paper: {
-            borderRadius: 16,
-            boxShadow: mode === 'light'
-              ? '0px 8px 24px rgba(0, 0, 0, 0.15)'
-              : '0px 8px 24px rgba(0, 0, 0, 0.4)',
-          },
-        },
-      },
-      MuiDivider: {
-        styleOverrides: {
-          root: {
-            borderColor: mode === 'light'
-              ? 'rgba(0, 0, 0, 0.12)'
-              : 'rgba(255, 255, 255, 0.12)',
-          },
-        },
-      },
-      MuiTooltip: {
-        styleOverrides: {
-          tooltip: {
-            backgroundColor: mode === 'light'
-              ? 'rgba(0, 0, 0, 0.8)'
-              : 'rgba(255, 255, 255, 0.8)',
-            color: mode === 'light' ? '#fff' : '#000',
-            fontSize: '0.75rem',
-            borderRadius: 4,
-            padding: '8px 12px',
-          },
-        },
-      },
     },
   });
 };
 
-// Create the theme (default to light mode)
-const theme = createAppTheme('light');
+// Theme context type
+interface ThemeContextType {
+  mode: PaletteMode;
+  toggleColorMode: () => void;
+}
 
-export default theme;
+// Create context
+export const ThemeContext = createContext<ThemeContextType>({
+  mode: 'light',
+  toggleColorMode: () => {},
+});
+
+// Theme provider props
+interface ThemeProviderProps {
+  children: React.ReactNode;
+}
+
+// Theme provider component
+export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
+  // Get saved theme from localStorage or use light mode as default
+  const [mode, setMode] = useState<PaletteMode>(() => {
+    const savedMode = localStorage.getItem('themeMode');
+    return (savedMode as PaletteMode) || 'light';
+  });
+
+  // Toggle between light and dark mode
+  const toggleColorMode = () => {
+    setMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));
+  };
+
+  // Save theme mode to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('themeMode', mode);
+  }, [mode]);
+
+  // Create theme based on current mode
+  const theme = useMemo(() => createAppTheme(mode), [mode]);
+
+  // Context value
+  const contextValue = useMemo(
+    () => ({
+      mode,
+      toggleColorMode,
+    }),
+    [mode]
+  );
+
+  return (
+    <ThemeContext.Provider value={contextValue}>
+      <MuiThemeProvider theme={theme}>
+        <CssBaseline />
+        {children}
+      </MuiThemeProvider>
+    </ThemeContext.Provider>
+  );
+};
+
+// Custom hook to use theme context
+export const useThemeContext = () => {
+  const context = React.useContext(ThemeContext);
+  if (context === undefined) {
+    throw new Error('useThemeContext must be used within a ThemeProvider');
+  }
+  return context;
+};

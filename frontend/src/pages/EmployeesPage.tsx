@@ -28,14 +28,19 @@ import {
   TablePagination,
   TableSortLabel,
   InputAdornment,
+  Chip,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   Search as SearchIcon,
+  People as PeopleIcon,
+  Home as HomeIcon,
+  Store as StoreIcon,
 } from '@mui/icons-material';
 import apiClient from '../api/client';
+import { PageContainer, ContentSection } from '../components/ui';
 
 interface Employee {
   id: number;
@@ -269,7 +274,7 @@ export default function EmployeesPage() {
 
   const filterData = (data: Employee[]) => {
     return data.filter((employee) => {
-      const matchesSearch = searchTerm === '' || 
+      const matchesSearch = searchTerm === '' ||
         employee.user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
         employee.user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         employee.branch.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -298,161 +303,195 @@ export default function EmployeesPage() {
   );
 
   return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">Employees</Typography>
+    <PageContainer
+      title="Employees"
+      subtitle="Manage your pawnshop employees"
+      breadcrumbs={[
+        { label: 'Home', path: '/', icon: <HomeIcon sx={{ mr: 0.5 }} fontSize="small" /> },
+        { label: 'Branch Management' },
+        { label: 'Employees' },
+      ]}
+      actions={
         <Button
           variant="contained"
+          color="primary"
           startIcon={<AddIcon />}
           onClick={() => handleOpenDialog()}
         >
           Add Employee
         </Button>
-      </Box>
-
+      }
+      loading={employeesLoading || branchesLoading || employeeTypesLoading}
+      refreshable
+      onRefresh={() => {
+        queryClient.invalidateQueries({ queryKey: ['employees'] });
+        queryClient.invalidateQueries({ queryKey: ['branches'] });
+        queryClient.invalidateQueries({ queryKey: ['employee-types'] });
+      }}
+    >
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mb: 3 }}>
           {error}
         </Alert>
       )}
 
-      <Box display="flex" gap={2} mb={3}>
-        <TextField
-          placeholder="Search employees..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
-          }}
-        />
-        <FormControl sx={{ minWidth: 200 }}>
-          <InputLabel>Branch</InputLabel>
-          <Select
-            value={selectedBranch}
-            label="Branch"
-            onChange={(e) => setSelectedBranch(e.target.value as number | 'all')}
-          >
-            <MenuItem value="all">All Branches</MenuItem>
-            {branches?.map((branch) => (
-              <MenuItem key={branch.id} value={branch.id}>
-                {branch.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl sx={{ minWidth: 200 }}>
-          <InputLabel>Employee Type</InputLabel>
-          <Select
-            value={selectedType}
-            label="Employee Type"
-            onChange={(e) => setSelectedType(e.target.value as number | 'all')}
-          >
-            <MenuItem value="all">All Types</MenuItem>
-            {employeeTypes?.map((type) => (
-              <MenuItem key={type.id} value={type.id}>
-                {type.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </Box>
+      <ContentSection
+        title="Employee Management"
+        icon={<PeopleIcon color="primary" />}
+        variant="paper"
+        elevation={1}
+      >
+        <Box display="flex" gap={2} mb={3} flexWrap="wrap">
+          <TextField
+            placeholder="Search employees..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <FormControl sx={{ minWidth: 200 }}>
+            <InputLabel>Branch</InputLabel>
+            <Select
+              value={selectedBranch}
+              label="Branch"
+              onChange={(e) => setSelectedBranch(e.target.value as number | 'all')}
+            >
+              <MenuItem value="all">All Branches</MenuItem>
+              {branches?.map((branch) => (
+                <MenuItem key={branch.id} value={branch.id}>
+                  {branch.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl sx={{ minWidth: 200 }}>
+            <InputLabel>Employee Type</InputLabel>
+            <Select
+              value={selectedType}
+              label="Employee Type"
+              onChange={(e) => setSelectedType(e.target.value as number | 'all')}
+            >
+              <MenuItem value="all">All Types</MenuItem>
+              {employeeTypes?.map((type) => (
+                <MenuItem key={type.id} value={type.id}>
+                  {type.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>
-                <TableSortLabel
-                  active={orderBy === 'username'}
-                  direction={orderBy === 'username' ? order : 'asc'}
-                  onClick={() => handleRequestSort('username')}
-                >
-                  Username
-                </TableSortLabel>
-              </TableCell>
-              <TableCell>
-                <TableSortLabel
-                  active={orderBy === 'email'}
-                  direction={orderBy === 'email' ? order : 'asc'}
-                  onClick={() => handleRequestSort('email')}
-                >
-                  Email
-                </TableSortLabel>
-              </TableCell>
-              <TableCell>
-                <TableSortLabel
-                  active={orderBy === 'branch'}
-                  direction={orderBy === 'branch' ? order : 'asc'}
-                  onClick={() => handleRequestSort('branch')}
-                >
-                  Branch
-                </TableSortLabel>
-              </TableCell>
-              <TableCell>
-                <TableSortLabel
-                  active={orderBy === 'type'}
-                  direction={orderBy === 'type' ? order : 'asc'}
-                  onClick={() => handleRequestSort('type')}
-                >
-                  Type
-                </TableSortLabel>
-              </TableCell>
-              <TableCell>
-                <TableSortLabel
-                  active={orderBy === 'hire_date'}
-                  direction={orderBy === 'hire_date' ? order : 'asc'}
-                  onClick={() => handleRequestSort('hire_date')}
-                >
-                  Hire Date
-                </TableSortLabel>
-              </TableCell>
-              <TableCell>
-                <TableSortLabel
-                  active={orderBy === 'status'}
-                  direction={orderBy === 'status' ? order : 'asc'}
-                  onClick={() => handleRequestSort('status')}
-                >
-                  Status
-                </TableSortLabel>
-              </TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {paginatedEmployees.map((employee) => (
-              <TableRow key={employee.id}>
-                <TableCell>{employee.user.username}</TableCell>
-                <TableCell>{employee.user.email}</TableCell>
-                <TableCell>{employee.branch.name}</TableCell>
-                <TableCell>{employee.employee_type.name}</TableCell>
-                <TableCell>{new Date(employee.hire_date).toLocaleDateString()}</TableCell>
-                <TableCell>{employee.is_active ? 'Active' : 'Inactive'}</TableCell>
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
                 <TableCell>
-                  <IconButton onClick={() => handleOpenDialog(employee)}>
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton onClick={() => handleDelete(employee.id)}>
-                    <DeleteIcon />
-                  </IconButton>
+                  <TableSortLabel
+                    active={orderBy === 'username'}
+                    direction={orderBy === 'username' ? order : 'asc'}
+                    onClick={() => handleRequestSort('username')}
+                  >
+                    Username
+                  </TableSortLabel>
                 </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={orderBy === 'email'}
+                    direction={orderBy === 'email' ? order : 'asc'}
+                    onClick={() => handleRequestSort('email')}
+                  >
+                    Email
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={orderBy === 'branch'}
+                    direction={orderBy === 'branch' ? order : 'asc'}
+                    onClick={() => handleRequestSort('branch')}
+                  >
+                    Branch
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={orderBy === 'type'}
+                    direction={orderBy === 'type' ? order : 'asc'}
+                    onClick={() => handleRequestSort('type')}
+                  >
+                    Type
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={orderBy === 'hire_date'}
+                    direction={orderBy === 'hire_date' ? order : 'asc'}
+                    onClick={() => handleRequestSort('hire_date')}
+                  >
+                    Hire Date
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={orderBy === 'status'}
+                    direction={orderBy === 'status' ? order : 'asc'}
+                    onClick={() => handleRequestSort('status')}
+                  >
+                    Status
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>Actions</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
-          component="div"
-          count={filteredEmployees.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={handleChangePage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-        />
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {paginatedEmployees.map((employee) => (
+                <TableRow key={employee.id}>
+                  <TableCell>{employee.user.username}</TableCell>
+                  <TableCell>{employee.user.email}</TableCell>
+                  <TableCell>
+                    <Chip
+                      icon={<StoreIcon fontSize="small" />}
+                      label={employee.branch.name}
+                      size="small"
+                      variant="outlined"
+                    />
+                  </TableCell>
+                  <TableCell>{employee.employee_type.name}</TableCell>
+                  <TableCell>{new Date(employee.hire_date).toLocaleDateString()}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={employee.is_active ? 'Active' : 'Inactive'}
+                      color={employee.is_active ? 'success' : 'default'}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <IconButton onClick={() => handleOpenDialog(employee)}>
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton onClick={() => handleDelete(employee.id)}>
+                      <DeleteIcon />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25]}
+            component="div"
+            count={filteredEmployees.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+          />
+        </TableContainer>
+      </ContentSection>
 
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <DialogTitle>{selectedEmployee ? 'Edit Employee' : 'Add Employee'}</DialogTitle>
@@ -517,6 +556,6 @@ export default function EmployeesPage() {
           </DialogActions>
         </form>
       </Dialog>
-    </Box>
+    </PageContainer>
   );
-} 
+}

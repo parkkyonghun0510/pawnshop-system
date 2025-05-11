@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
 import {
   Box,
   Drawer,
@@ -17,37 +17,177 @@ import {
   Menu,
   MenuItem,
   Tooltip,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
-import {
-  Menu as MenuIcon,
-  Dashboard as DashboardIcon,
-  Store as StoreIcon,
-  People as PeopleIcon,
-  Person as PersonIcon,
-  Inventory as InventoryIcon,
-  Receipt as ReceiptIcon,
-  ReceiptLong as TransactionsIcon,
-  BarChart as ReportsIcon,
-  Settings as SettingsIcon,
-  Logout as LogoutIcon,
-  ChevronLeft as ChevronLeftIcon,
-  AccountCircle as AccountCircleIcon,
-  Notifications as NotificationsIcon,
-} from '@mui/icons-material';
+import { alpha } from '@mui/material/styles';
+// Split icon imports for better code splitting
+import MenuIcon from '@mui/icons-material/Menu';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import StoreIcon from '@mui/icons-material/Store';
+import PeopleIcon from '@mui/icons-material/People';
+import PersonIcon from '@mui/icons-material/Person';
+import InventoryIcon from '@mui/icons-material/Inventory';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import TransactionsIcon from '@mui/icons-material/ReceiptLong';
+import ReportsIcon from '@mui/icons-material/BarChart';
+import SettingsIcon from '@mui/icons-material/Settings';
+import LogoutIcon from '@mui/icons-material/Logout';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { styled } from '@mui/material/styles';
 
-// Drawer width
-const drawerWidth = 240;
+// Constants
+const DRAWER_WIDTH = 240;
+const COLLAPSED_DRAWER_WIDTH = 72;
+
+// Styled components for better performance
+const StyledAppBar = styled(AppBar, {
+  shouldForwardProp: (prop) => prop !== 'open'
+})<{ open?: boolean }>(({ theme, open }) => ({
+  zIndex: theme.zIndex.drawer + 1,
+  transition: theme.transitions.create(['width', 'margin'], {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.leavingScreen,
+  }),
+  ...(open && {
+    marginLeft: DRAWER_WIDTH,
+    width: `calc(100% - ${DRAWER_WIDTH}px)`,
+    transition: theme.transitions.create(['width', 'margin'], {
+      easing: theme.transitions.easing.sharp,
+      duration: theme.transitions.duration.enteringScreen,
+    }),
+  }),
+}));
+
+const StyledDrawer = styled(Drawer, {
+  shouldForwardProp: (prop) => prop !== 'open'
+})<{ open?: boolean }>(({ theme, open }) => ({
+  width: open ? DRAWER_WIDTH : COLLAPSED_DRAWER_WIDTH,
+  flexShrink: 0,
+  whiteSpace: 'nowrap',
+  boxSizing: 'border-box',
+  transition: theme.transitions.create('width', {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.enteringScreen,
+  }),
+  overflowX: 'hidden',
+  '& .MuiDrawer-paper': {
+    width: open ? DRAWER_WIDTH : COLLAPSED_DRAWER_WIDTH,
+    transition: theme.transitions.create('width', {
+      easing: theme.transitions.easing.sharp,
+      duration: theme.transitions.duration.enteringScreen,
+    }),
+    overflowX: 'hidden',
+    boxSizing: 'border-box',
+    borderRight: `1px solid ${theme.palette.divider}`,
+    backgroundColor: theme.palette.background.paper,
+    boxShadow: 'none',
+    '&:hover': {
+      boxShadow: open ? 'none' : theme.shadows[3],
+    },
+  },
+}));
+
+const MainContent = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'open'
+})<{ open?: boolean }>(({ theme, open }) => ({
+  flexGrow: 1,
+  padding: theme.spacing(3),
+  marginTop: theme.spacing(8),
+  marginLeft: open ? 0 : theme.spacing(2),
+  backgroundColor: theme.palette.background.default,
+  height: '100%',
+  overflow: 'auto',
+  transition: theme.transitions.create(['margin', 'padding'], {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.leavingScreen,
+  }),
+  [theme.breakpoints.down('sm')]: {
+    padding: theme.spacing(2),
+    marginLeft: 0,
+  },
+}));
+
+// Memoized navigation item component to prevent unnecessary re-renders
+const NavItem = React.memo(({
+  item,
+  open,
+  onNavigate,
+  active
+}: {
+  item: { text: string; icon: React.ReactNode; path: string };
+  open: boolean;
+  onNavigate: (path: string) => void;
+  active: boolean;
+}) => {
+  const theme = useTheme();
+
+  return (
+    <ListItem disablePadding sx={{ display: 'block', my: 0.5 }}>
+      <Tooltip title={!open ? item.text : ''} placement="right" arrow>
+        <ListItemButton
+          sx={{
+            minHeight: 44,
+            justifyContent: open ? 'initial' : 'center',
+            px: open ? 2 : 1.5,
+            py: 1,
+            mx: open ? 1 : 0.5,
+            borderRadius: 1,
+            backgroundColor: active ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
+            '&:hover': {
+              backgroundColor: active
+                ? alpha(theme.palette.primary.main, 0.2)
+                : alpha(theme.palette.primary.main, 0.05),
+            },
+            borderLeft: active ? `3px solid ${theme.palette.primary.main}` : '3px solid transparent',
+          }}
+          onClick={() => onNavigate(item.path)}
+        >
+          <ListItemIcon
+            sx={{
+              minWidth: 0,
+              mr: open ? 2 : 'auto',
+              justifyContent: 'center',
+              color: active ? theme.palette.primary.main : theme.palette.text.primary,
+              fontSize: '1.25rem',
+            }}
+          >
+            {item.icon}
+          </ListItemIcon>
+          <ListItemText
+            primary={item.text}
+            sx={{
+              opacity: open ? 1 : 0,
+              '& .MuiTypography-root': {
+                fontWeight: active ? 600 : 400,
+                fontSize: '0.9rem',
+              }
+            }}
+          />
+        </ListItemButton>
+      </Tooltip>
+    </ListItem>
+  );
+});
 
 const Layout = () => {
+  const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
-  const [open, setOpen] = useState(true);
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+  // State
+  const [open, setOpen] = useState(!isMobile);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
-  // Navigation items
-  const navItems = [
+  // Navigation items - memoized to prevent unnecessary re-renders
+  const navItems = useMemo(() => [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
     { text: 'Branches', icon: <StoreIcon />, path: '/branches' },
     { text: 'Employees', icon: <PeopleIcon />, path: '/employees' },
@@ -57,65 +197,75 @@ const Layout = () => {
     { text: 'Loans', icon: <ReceiptIcon />, path: '/loans' },
     { text: 'Transactions', icon: <TransactionsIcon />, path: '/transactions' },
     { text: 'Reports', icon: <ReportsIcon />, path: '/reports' },
-  ];
+  ], []);
 
-  // Toggle drawer
-  const toggleDrawer = () => {
-    setOpen(!open);
-  };
+  // Check if a path is active
+  const isActive = useCallback((path: string) => {
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
+  }, [location.pathname]);
 
-  // Handle user menu open
-  const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
+  // Memoized navigation handler
+  const handleNavigate = useCallback((path: string) => {
+    navigate(path);
+  }, [navigate]);
+
+  // Close drawer on mobile when location changes
+  useEffect(() => {
+    if (isMobile) {
+      setOpen(false);
+    }
+  }, [location, isMobile]);
+
+  // Toggle drawer - memoized to prevent unnecessary re-renders
+  const toggleDrawer = useCallback(() => {
+    setOpen((prevOpen) => !prevOpen);
+  }, []);
+
+  // Handle user menu open - memoized
+  const handleMenu = useCallback((event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
-  };
+  }, []);
 
-  // Handle user menu close
-  const handleClose = () => {
+  // Handle user menu close - memoized
+  const handleClose = useCallback(() => {
     setAnchorEl(null);
-  };
+  }, []);
 
-  // Handle profile click
-  const handleProfile = () => {
+  // Handle profile click - memoized
+  const handleProfile = useCallback(() => {
     handleClose();
     navigate('/profile');
-  };
+  }, [handleClose, navigate]);
 
-  // Handle settings click
-  const handleSettings = () => {
+  // Handle settings click - memoized
+  const handleSettings = useCallback(() => {
     handleClose();
     navigate('/settings');
-  };
+  }, [handleClose, navigate]);
 
-  // Handle logout
-  const handleLogout = () => {
+  // Handle logout - memoized
+  const handleLogout = useCallback(() => {
     handleClose();
     logout();
     navigate('/login');
-  };
+  }, [handleClose, logout, navigate]);
+
+  // Performance monitoring
+  useEffect(() => {
+    // Record render time
+    const startTime = performance.now();
+
+    return () => {
+      // Log render duration on unmount
+      const endTime = performance.now();
+      console.debug(`Layout render time: ${endTime - startTime}ms`);
+    };
+  }, []);
 
   return (
     <Box sx={{ display: 'flex', height: '100vh' }}>
       {/* App Bar */}
-      <AppBar
-        position="fixed"
-        sx={{
-          zIndex: (theme) => theme.zIndex.drawer + 1,
-          transition: (theme) =>
-            theme.transitions.create(['width', 'margin'], {
-              easing: theme.transitions.easing.sharp,
-              duration: theme.transitions.duration.leavingScreen,
-            }),
-          ...(open && {
-            marginLeft: drawerWidth,
-            width: `calc(100% - ${drawerWidth}px)`,
-            transition: (theme) =>
-              theme.transitions.create(['width', 'margin'], {
-                easing: theme.transitions.easing.sharp,
-                duration: theme.transitions.duration.enteringScreen,
-              }),
-          }),
-        }}
-      >
+      <StyledAppBar position="fixed" open={open}>
         <Toolbar>
           <IconButton
             color="inherit"
@@ -192,95 +342,64 @@ const Layout = () => {
             </Menu>
           </div>
         </Toolbar>
-      </AppBar>
+      </StyledAppBar>
 
       {/* Side Drawer */}
-      <Drawer
-        variant="permanent"
-        open={open}
-        sx={{
-          width: drawerWidth,
-          flexShrink: 0,
-          [`& .MuiDrawer-paper`]: {
-            width: drawerWidth,
-            boxSizing: 'border-box',
-            whiteSpace: 'nowrap',
-            overflowX: 'hidden',
-            transition: (theme) =>
-              theme.transitions.create('width', {
-                easing: theme.transitions.easing.sharp,
-                duration: theme.transitions.duration.enteringScreen,
-              }),
-            ...(open
-              ? {
-                width: drawerWidth,
-              }
-              : {
-                width: theme => theme.spacing(7),
-                [theme.breakpoints.up('sm')]: {
-                  width: theme => theme.spacing(9),
-                },
-              }),
-          },
-        }}
-      >
-        <Toolbar
+      <StyledDrawer variant="permanent" open={open}>
+        <Box
           sx={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'flex-end',
-            px: [1],
+            justifyContent: open ? 'space-between' : 'center',
+            padding: theme.spacing(0, 1),
+            minHeight: '64px',
           }}
         >
-          <IconButton onClick={toggleDrawer}>
-            <ChevronLeftIcon />
+          {open && (
+            <Typography
+              variant="h6"
+              noWrap
+              component="div"
+              sx={{
+                pl: 2,
+                fontWeight: 'bold',
+                color: theme.palette.primary.main
+              }}
+            >
+              Pawn Shop
+            </Typography>
+          )}
+          <IconButton
+            onClick={toggleDrawer}
+            sx={{
+              borderRadius: 1.5,
+              backgroundColor: alpha(theme.palette.primary.main, 0.04),
+              '&:hover': {
+                backgroundColor: alpha(theme.palette.primary.main, 0.08),
+              }
+            }}
+          >
+            {open ? <ChevronLeftIcon /> : <MenuIcon />}
           </IconButton>
-        </Toolbar>
-        <Divider />
-        <List component="nav">
+        </Box>
+        <Divider sx={{ mx: 2 }} />
+        <List component="nav" sx={{ pt: 1 }}>
           {navItems.map((item) => (
-            <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
-              <ListItemButton
-                sx={{
-                  minHeight: 48,
-                  justifyContent: open ? 'initial' : 'center',
-                  px: 2.5,
-                }}
-                onClick={() => navigate(item.path)}
-              >
-                <ListItemIcon
-                  sx={{
-                    minWidth: 0,
-                    mr: open ? 3 : 'auto',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {item.icon}
-                </ListItemIcon>
-                <ListItemText
-                  primary={item.text}
-                  sx={{ opacity: open ? 1 : 0 }}
-                />
-              </ListItemButton>
-            </ListItem>
+            <NavItem
+              key={item.text}
+              item={item}
+              open={open}
+              onNavigate={handleNavigate}
+              active={isActive(item.path)}
+            />
           ))}
         </List>
-      </Drawer>
+      </StyledDrawer>
 
       {/* Main Content */}
-      <Box
-        component="main"
-        sx={{
-          flexGrow: 1,
-          p: 3,
-          mt: 8,
-          backgroundColor: (theme) => theme.palette.background.default,
-          height: '100%',
-          overflow: 'auto',
-        }}
-      >
+      <MainContent open={open}>
         <Outlet />
-      </Box>
+      </MainContent>
     </Box>
   );
 };

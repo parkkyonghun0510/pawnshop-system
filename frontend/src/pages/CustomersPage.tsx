@@ -3,14 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box,
   Button,
-  Paper,
   Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   IconButton,
   Dialog,
   DialogTitle,
@@ -19,12 +12,13 @@ import {
   TextField,
   FormControlLabel,
   Switch,
-  TablePagination,
   InputAdornment,
   CircularProgress,
   Alert,
   Snackbar,
   Chip,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -35,6 +29,7 @@ import {
   Email as EmailIcon,
 } from '@mui/icons-material';
 import apiClient from '../api/client';
+import { DataTable, TableSkeleton } from '../components/ui';
 
 interface Customer {
   id: number;
@@ -64,6 +59,8 @@ interface CustomerFormData {
 }
 
 export default function CustomersPage() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [search, setSearch] = useState('');
@@ -96,11 +93,11 @@ export default function CustomersPage() {
         skip: (page * rowsPerPage).toString(),
         limit: rowsPerPage.toString(),
       });
-      
+
       if (search) {
         params.append('search', search);
       }
-      
+
       const response = await apiClient.get(`/customers/?${params.toString()}`);
       return response.data;
     },
@@ -281,81 +278,70 @@ export default function CustomersPage() {
         </Box>
       </Box>
 
-      <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-        {isLoading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-            <CircularProgress />
-          </Box>
-        ) : error ? (
-          <Alert severity="error">Error loading customers: {(error as any).message}</Alert>
-        ) : (
-          <>
-            <TableContainer sx={{ maxHeight: 640 }}>
-              <Table stickyHeader aria-label="sticky table">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>ID</TableCell>
-                    <TableCell>Code</TableCell>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Contact</TableCell>
-                    <TableCell>Address</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {customers?.map((customer: Customer) => (
-                    <TableRow hover role="checkbox" tabIndex={-1} key={customer.id}>
-                      <TableCell>{customer.id}</TableCell>
-                      <TableCell>{customer.customer_code}</TableCell>
-                      <TableCell>{`${customer.first_name} ${customer.last_name}`}</TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <EmailIcon fontSize="small" />
-                            {customer.email}
-                          </Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <PhoneIcon fontSize="small" />
-                            {customer.phone}
-                          </Box>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        {`${customer.address}, ${customer.city}, ${customer.state} ${customer.zip_code}`}
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={customer.is_active ? 'Active' : 'Inactive'}
-                          color={customer.is_active ? 'success' : 'default'}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <IconButton onClick={() => handleOpenDialog(customer)} size="small">
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton onClick={() => handleDeleteCustomer(customer.id)} size="small" color="error">
-                          <DeleteIcon />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            <TablePagination
-              rowsPerPageOptions={[5, 10, 25, 50]}
-              component="div"
-              count={-1} // -1 indicates that the total count is unknown
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={handleChangePage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
-            />
-          </>
-        )}
-      </Paper>
+      <DataTable
+        columns={[
+          { id: 'id', label: 'ID', minWidth: 70 },
+          { id: 'customer_code', label: 'Code', minWidth: 100 },
+          {
+            id: 'name',
+            label: 'Name',
+            minWidth: 150,
+            format: (value, row: any) => `${row.first_name} ${row.last_name}`
+          },
+          {
+            id: 'contact',
+            label: 'Contact',
+            minWidth: 200,
+            format: (value, row: any) => (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <EmailIcon fontSize="small" />
+                  {row.email}
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <PhoneIcon fontSize="small" />
+                  {row.phone}
+                </Box>
+              </Box>
+            )
+          },
+          {
+            id: 'address',
+            label: 'Address',
+            minWidth: 250,
+            format: (value, row: any) =>
+              `${row.address}, ${row.city}, ${row.state} ${row.zip_code}`
+          },
+          {
+            id: 'is_active',
+            label: 'Status',
+            minWidth: 100,
+            format: (value) => (
+              <Chip
+                label={value ? 'Active' : 'Inactive'}
+                color={value ? 'success' : 'default'}
+                size="small"
+              />
+            )
+          },
+        ]}
+        data={customers || []}
+        keyField="id"
+        loading={isLoading}
+        error={error ? `Error loading customers: ${(error as any).message}` : null}
+        showActions
+        onEdit={handleOpenDialog}
+        onDelete={handleDeleteCustomer}
+        pagination
+        page={page}
+        initialRowsPerPage={rowsPerPage}
+        onPageChange={handleChangePage}
+        onRowsPerPageChange={handleChangeRowsPerPage}
+        virtualized={!isMobile}
+        maxHeight={640}
+        rowHeight={70}
+        elevation={1}
+      />
 
       {/* Customer Form Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} fullWidth maxWidth="sm">
@@ -482,4 +468,4 @@ export default function CustomersPage() {
       </Snackbar>
     </Box>
   );
-} 
+}

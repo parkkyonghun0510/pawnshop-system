@@ -3,14 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box,
   Button,
-  Paper,
   Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   IconButton,
   Dialog,
   DialogTitle,
@@ -23,13 +16,14 @@ import {
   MenuItem,
   FormControlLabel,
   Switch,
-  TablePagination,
   InputAdornment,
   CircularProgress,
   Alert,
   Snackbar,
   Chip,
   Grid,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -41,6 +35,7 @@ import {
   Category as CategoryIcon,
 } from '@mui/icons-material';
 import apiClient from '../api/client';
+import { DataTable, TableSkeleton } from '../components/ui';
 
 interface InventoryItem {
   id: number;
@@ -80,6 +75,8 @@ const statuses = ['Available', 'On Loan', 'Sold', 'Reserved', 'In Repair', 'Lost
 const categories = ['Electronics', 'Jewelry', 'Watches', 'Musical Instruments', 'Tools', 'Firearms', 'Collectibles', 'Other'];
 
 export default function InventoryPage() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [search, setSearch] = useState('');
@@ -115,19 +112,19 @@ export default function InventoryPage() {
         skip: (page * rowsPerPage).toString(),
         limit: rowsPerPage.toString(),
       });
-      
+
       if (search) {
         params.append('search', search);
       }
-      
+
       if (categoryFilter) {
         params.append('category', categoryFilter);
       }
-      
+
       if (statusFilter) {
         params.append('status', statusFilter);
       }
-      
+
       const response = await apiClient.get(`/inventory/?${params.toString()}`);
       return response.data;
     },
@@ -213,9 +210,9 @@ export default function InventoryPage() {
   // Handle form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
     const { name, value, checked } = e.target as HTMLInputElement & { name?: string; value: unknown; checked?: boolean };
-    
+
     if (!name) return;
-    
+
     setFormData({
       ...formData,
       [name]: name === 'is_active' ? checked : (
@@ -357,106 +354,95 @@ export default function InventoryPage() {
         </Box>
       </Box>
 
-      <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-        {isLoading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-            <CircularProgress />
-          </Box>
-        ) : error ? (
-          <Alert severity="error">Error loading inventory: {(error as any).message}</Alert>
-        ) : (
-          <>
-            <TableContainer sx={{ maxHeight: 640 }}>
-              <Table stickyHeader aria-label="sticky table">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Code</TableCell>
-                    <TableCell>Item</TableCell>
-                    <TableCell>Category</TableCell>
-                    <TableCell>Prices</TableCell>
-                    <TableCell>Condition</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Location</TableCell>
-                    <TableCell>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {inventory?.map((item: InventoryItem) => (
-                    <TableRow hover role="checkbox" tabIndex={-1} key={item.id}>
-                      <TableCell>{item.item_code}</TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                          <Typography variant="body2" fontWeight="bold">{item.name}</Typography>
-                          <Typography variant="caption" color="text.secondary" noWrap>
-                            {item.description.length > 50 
-                              ? `${item.description.substring(0, 50)}...` 
-                              : item.description}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Chip 
-                          icon={<CategoryIcon fontSize="small" />} 
-                          label={item.category} 
-                          size="small" 
-                          variant="outlined"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                          <Typography variant="body2">
-                            <strong>Marked:</strong> {formatCurrency(item.marked_price)}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            <strong>Acquisition:</strong> {formatCurrency(item.acquisition_price)}
-                          </Typography>
-                          {item.marked_price > item.acquisition_price && (
-                            <Typography variant="caption" color="success.main">
-                              Margin: {Math.round((item.marked_price - item.acquisition_price) / item.acquisition_price * 100)}%
-                            </Typography>
-                          )}
-                        </Box>
-                      </TableCell>
-                      <TableCell>{item.condition}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={item.status}
-                          color={
-                            item.status === 'Available' ? 'success' :
-                            item.status === 'On Loan' ? 'primary' :
-                            item.status === 'Sold' ? 'secondary' :
-                            item.status === 'Reserved' ? 'info' :
-                            item.status === 'In Repair' ? 'warning' : 'default'
-                          }
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>{item.location}</TableCell>
-                      <TableCell>
-                        <IconButton onClick={() => handleOpenDialog(item)} size="small">
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton onClick={() => handleDeleteItem(item.id)} size="small" color="error">
-                          <DeleteIcon />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            <TablePagination
-              rowsPerPageOptions={[5, 10, 25, 50]}
-              component="div"
-              count={-1} // -1 indicates that the total count is unknown
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={handleChangePage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
-            />
-          </>
-        )}
-      </Paper>
+      <DataTable
+        columns={[
+          { id: 'item_code', label: 'Code', minWidth: 100 },
+          {
+            id: 'item_details',
+            label: 'Item',
+            minWidth: 200,
+            format: (value, row: any) => (
+              <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                <Typography variant="body2" fontWeight="bold">{row.name}</Typography>
+                <Typography variant="caption" color="text.secondary" noWrap>
+                  {row.description.length > 50
+                    ? `${row.description.substring(0, 50)}...`
+                    : row.description}
+                </Typography>
+              </Box>
+            )
+          },
+          {
+            id: 'category',
+            label: 'Category',
+            minWidth: 150,
+            format: (value) => (
+              <Chip
+                icon={<CategoryIcon fontSize="small" />}
+                label={value}
+                size="small"
+                variant="outlined"
+              />
+            )
+          },
+          {
+            id: 'prices',
+            label: 'Prices',
+            minWidth: 180,
+            format: (value, row: any) => (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                <Typography variant="body2">
+                  <strong>Marked:</strong> {formatCurrency(row.marked_price)}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  <strong>Acquisition:</strong> {formatCurrency(row.acquisition_price)}
+                </Typography>
+                {row.marked_price > row.acquisition_price && (
+                  <Typography variant="caption" color="success.main">
+                    Margin: {Math.round((row.marked_price - row.acquisition_price) / row.acquisition_price * 100)}%
+                  </Typography>
+                )}
+              </Box>
+            )
+          },
+          { id: 'condition', label: 'Condition', minWidth: 120 },
+          {
+            id: 'status',
+            label: 'Status',
+            minWidth: 120,
+            format: (value) => (
+              <Chip
+                label={value}
+                color={
+                  value === 'Available' ? 'success' :
+                    value === 'On Loan' ? 'primary' :
+                      value === 'Sold' ? 'secondary' :
+                        value === 'Reserved' ? 'info' :
+                          value === 'In Repair' ? 'warning' : 'default'
+                }
+                size="small"
+              />
+            )
+          },
+          { id: 'location', label: 'Location', minWidth: 120 },
+        ]}
+        data={inventory || []}
+        keyField="id"
+        loading={isLoading}
+        error={error ? `Error loading inventory: ${(error as any).message}` : null}
+        showActions
+        onEdit={handleOpenDialog}
+        onDelete={handleDeleteItem}
+        pagination
+        page={page}
+        initialRowsPerPage={rowsPerPage}
+        onPageChange={handleChangePage}
+        onRowsPerPageChange={handleChangeRowsPerPage}
+        virtualized={!isMobile}
+        maxHeight={640}
+        rowHeight={80}
+        elevation={1}
+      />
 
       {/* Inventory Item Form Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} fullWidth maxWidth="md">
@@ -637,4 +623,4 @@ export default function InventoryPage() {
       </Snackbar>
     </Box>
   );
-} 
+}
