@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.config import settings
-from app.database import get_async_db
+from app.database import get_async_db, get_db
 
 
 # Setup password hashing context
@@ -78,29 +78,40 @@ async def get_token_from_cookie_or_header(request: Request):
 
         if auth_header:
             # Extract token from Authorization header
-            token = await oauth2_scheme(request)
+            scheme, token = auth_header.split()
+            if scheme.lower() != "bearer":
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid authentication scheme",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
             print("Token from header:", token)
             return token
         else:
-            raise HTTPException(status_code=401)
-    except HTTPException:
-        # If no authorization header, try to get from cookie
-        token = request.cookies.get("access_token")
-        print("Token from cookie:", token)
+            # If no authorization header, try to get from cookie
+            token = request.cookies.get("access_token")
+            print("Token from cookie:", token)
 
-        if not token:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Not authenticated",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+            if not token:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Not authenticated",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
 
-        # Remove 'Bearer ' prefix if it exists
-        if token.startswith("Bearer "):
-            token = token[7:]
-            print("Token after removing Bearer prefix:", token)
+            # Remove 'Bearer ' prefix if it exists
+            if token.startswith("Bearer "):
+                token = token[7:]
+                print("Token after removing Bearer prefix:", token)
 
-        return token
+            return token
+    except Exception as e:
+        print(f"Error extracting token: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication error",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
 
 async def get_current_user_with_cookie(

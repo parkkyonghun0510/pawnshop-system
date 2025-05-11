@@ -53,6 +53,7 @@ const Layout = () => {
     { text: 'Employees', icon: <PeopleIcon />, path: '/employees' },
     { text: 'Customers', icon: <PersonIcon />, path: '/customers' },
     { text: 'Inventory', icon: <InventoryIcon />, path: '/inventory' },
+    { text: 'Loan Applications', icon: <TransactionsIcon />, path: '/loan-applications' },
     { text: 'Loans', icon: <ReceiptIcon />, path: '/loans' },
     { text: 'Transactions', icon: <TransactionsIcon />, path: '/transactions' },
     { text: 'Reports', icon: <ReportsIcon />, path: '/reports' },
@@ -212,14 +213,14 @@ const Layout = () => {
               }),
             ...(open
               ? {
-                  width: drawerWidth,
-                }
+                width: drawerWidth,
+              }
               : {
-                  width: theme => theme.spacing(7),
-                  [theme.breakpoints.up('sm')]: {
-                    width: theme => theme.spacing(9),
-                  },
-                }),
+                width: theme => theme.spacing(7),
+                [theme.breakpoints.up('sm')]: {
+                  width: theme => theme.spacing(9),
+                },
+              }),
           },
         }}
       >
@@ -284,4 +285,4 @@ const Layout = () => {
   );
 };
 
-export default Layout; 
+export default Layout;

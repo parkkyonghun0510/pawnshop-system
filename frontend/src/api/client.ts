@@ -54,14 +54,15 @@ apiClient.interceptors.request.use(
             throw new Error('Rate limit exceeded. Please try again later.');
         }
 
-        // Get token from cookie
-        const token = Cookies.get('access_token');
+        // Get token from localStorage or cookie
+        const token = localStorage.getItem('access_token') || Cookies.get('access_token');
 
         // If token exists, add it to Authorization header
         if (token && config.headers) {
             // Make sure to handle the 'Bearer ' prefix correctly
             const authToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
             config.headers.Authorization = authToken;
+            console.log('Setting Authorization header:', authToken);
         }
 
         // Get CSRF token if it exists
@@ -94,11 +95,15 @@ apiClient.interceptors.response.use(
         // If response includes a token, save it
         if (response.data && response.data.access_token) {
             const accessToken = response.data.access_token;
+            // Store in localStorage for easier access
+            localStorage.setItem('access_token', `Bearer ${accessToken}`);
+            // Also set in cookie as backup
             Cookies.set('access_token', `Bearer ${accessToken}`, {
                 path: '/',
                 secure: process.env.NODE_ENV === 'production',
                 sameSite: 'lax'
             });
+            console.log('Token saved:', accessToken);
         }
 
         return response;
@@ -109,8 +114,11 @@ apiClient.interceptors.response.use(
 
             // Handle 401 Unauthorized
             if (status === 401) {
+                // Clear token from both localStorage and cookies
+                localStorage.removeItem('access_token');
                 Cookies.remove('access_token', { path: '/' });
                 Cookies.remove('csrf_token', { path: '/' });
+                console.log('Authentication failed, cleared tokens');
 
                 // Redirect to login page if not already there
                 if (window.location.pathname !== '/login') {

@@ -51,7 +51,14 @@ async def read_users(
         )
 
     users = await user_service.get_users(db, skip, limit, filters)
-    return [create_user_response(user) for user in users]
+
+    # Create user responses with proper async handling
+    user_responses = []
+    for user in users:
+        user_response = await create_user_response(db, user)
+        user_responses.append(user_response)
+
+    return user_responses
 
 @router.post("/", response_model=UserResponse)
 async def create_user(
@@ -65,7 +72,7 @@ async def create_user(
     """
     try:
         user = await user_service.create_user(db, user_in)
-        return create_user_response(user)
+        return await create_user_response(db, user)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -92,7 +99,7 @@ async def read_user_by_id(
             detail="User not found"
         )
 
-    return create_user_response(user)
+    return await create_user_response(db, user)
 
 @router.put("/{user_id}", response_model=UserResponse)
 async def update_user(
@@ -121,7 +128,7 @@ async def update_user(
 
     try:
         updated_user = await user_service.update_user(db, user, user_in)
-        return create_user_response(updated_user)
+        return await create_user_response(db, updated_user)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -167,7 +174,14 @@ async def bulk_update_role(
             current_user_id=current_user.id,
             request=request
         )
-        return [create_user_response(user) for user in updated_users]
+
+        # Create user responses with proper async handling
+        user_responses = []
+        for user in updated_users:
+            user_response = await create_user_response(db, user)
+            user_responses.append(user_response)
+
+        return user_responses
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

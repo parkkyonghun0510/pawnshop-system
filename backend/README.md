@@ -97,13 +97,35 @@ The database schema includes the following main tables:
 3. Generate migration: `python -m alembic revision --autogenerate -m "Add new model"`
 4. Apply migration: `python -m alembic upgrade head`
 
-### Database Migrations
+### Database Migrations with Context7
 
-- Create revision: `python -m alembic revision -m "Description"`
-- Autogenerate revision: `python -m alembic revision --autogenerate -m "Description"`
+We use Context7, a structured approach to database migrations that categorizes migrations into 7 contexts:
+
+1. **Schema** - Database schema changes (tables, columns, constraints)
+2. **Data** - Data migrations and transformations
+3. **Indexes** - Index creation and optimization
+4. **Functions** - Database functions and stored procedures
+5. **Views** - Database views
+6. **Triggers** - Database triggers
+7. **Permissions** - Database permissions and grants
+
+#### Migration Commands
+
+- Create a new schema migration: `python scripts/update_schema.py --name add_feature --type schema`
+- Create a new data migration: `python scripts/update_schema.py --name seed_data --type data`
 - Apply migrations: `python -m alembic upgrade head`
 - Rollback one version: `python -m alembic downgrade -1`
 - Get migration history: `python -m alembic history`
+
+#### Migration Scripts
+
+- `scripts/clean_migrations.py`: Clean up empty and duplicate migrations
+- `scripts/check_schema_completeness.py`: Check for missing tables or relationships
+- `scripts/generate_complete_schema.py`: Generate a complete database schema migration
+- `scripts/init_db.py`: Initialize the database with Context7
+- `scripts/update_schema.py`: Update the database schema using Context7
+
+For more information, see the [migrations documentation](docs/migrations.md).
 
 ## Updated API Documentation
 

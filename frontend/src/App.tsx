@@ -14,6 +14,7 @@ import AppPortalPage from './pages/AppPortalPage';
 import RolesPage from './pages/RolesPage';
 import PermissionsPage from './pages/PermissionsPage';
 import AuditLogPage from './pages/AuditLogPage';
+import LoanApplicationsPage from './pages/LoanApplicationsPage';
 
 const App = () => {
     return (
@@ -170,6 +171,18 @@ const App = () => {
                         requireAll={false}
                     >
                         <AppPortalPage />
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/loan-applications"
+                element={
+                    <ProtectedRoute
+                        requiredPermissions={['view_loans', 'create_loans', 'manage_loans']}
+                        requireAll={false}
+                    >
+                        <LoanApplicationsPage />
                     </ProtectedRoute>
                 }
             />

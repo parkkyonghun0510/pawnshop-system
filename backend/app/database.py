@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from sqlalchemy import create_engine
 import os
 from dotenv import load_dotenv
@@ -16,7 +16,7 @@ if SQLALCHEMY_DATABASE_URL.startswith("postgresql://"):
 async_engine = create_async_engine(SQLALCHEMY_DATABASE_URL, echo=True)
 
 # Create synchronous engine for table creation
-engine = create_engine(SQLALCHEMY_DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://", 1), echo=True)
+sync_engine = create_engine(SQLALCHEMY_DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://", 1), echo=True)
 
 # Create AsyncSessionLocal class
 AsyncSessionLocal = sessionmaker(
@@ -27,6 +27,13 @@ AsyncSessionLocal = sessionmaker(
     autocommit=False,
 )
 
+# Create synchronous SessionLocal class
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=sync_engine,
+)
+
 # Create Base class
 Base = declarative_base()
 
@@ -34,3 +41,11 @@ Base = declarative_base()
 async def get_async_db():
     async with AsyncSessionLocal() as session:
         yield session
+
+# Synchronous DB Dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

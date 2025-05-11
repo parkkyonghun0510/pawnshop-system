@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -14,9 +14,9 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
@@ -34,7 +34,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
             raise credentials_exception
     except JWTError:
         raise credentials_exception
+
+    # Use synchronous query since we're using a synchronous Session
     user = db.query(User).filter(User.username == username).first()
     if user is None:
         raise credentials_exception
-    return user 
+
+    return user

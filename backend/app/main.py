@@ -8,15 +8,19 @@ from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import Base, engine, get_async_db
-from app.routers import users, branches, employees, customers, transactions, loans, auth, collaterals, payments, applications, reports, audit
+from app.database import get_async_db
+from app.routers import (
+    users, branches, employees, customers, transactions, loans, auth,
+    collaterals, payments, applications, reports, audit,
+    application_documents, application_reviews
+)
 from app.models.users import User, Role
 from app.core.config import settings
 from app.core.security import create_access_token, verify_password, get_current_user_with_cookie
 from app.websockets.dashboard import dashboard_manager
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
+# Database tables are managed by Alembic migrations
+# Do not use Base.metadata.create_all() here
 
 app = FastAPI(
     title="Pawnshop Management System API",
@@ -27,7 +31,7 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -48,6 +52,8 @@ app.include_router(loans.router, prefix=f"{api_prefix}/loans", tags=["loans"])
 app.include_router(collaterals.router, prefix=f"{api_prefix}/collaterals", tags=["collaterals"])
 app.include_router(payments.router, prefix=f"{api_prefix}/payments", tags=["payments"])
 app.include_router(applications.router, prefix=f"{api_prefix}/applications", tags=["applications"])
+app.include_router(application_documents.router, tags=["application-documents"])
+app.include_router(application_reviews.router, tags=["application-reviews"])
 app.include_router(reports.router, prefix=f"{api_prefix}/dashboard", tags=["reports"])
 app.include_router(audit.router, prefix=f"{api_prefix}/audit", tags=["audit"])
 

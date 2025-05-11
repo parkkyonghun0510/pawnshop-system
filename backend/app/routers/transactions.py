@@ -1,9 +1,9 @@
 from typing import Any, List, Optional, Dict, Union
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Body, status
-from sqlalchemy import or_, and_, func, extract, desc
+from sqlalchemy import or_, and_, func, extract, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -49,29 +49,29 @@ async def read_transactions(
     Retrieve transactions with optional filtering.
     """
     query = select(Transaction)
-    
+
     # Apply filters
     if transaction_type:
         query = query.filter(Transaction.transaction_type == transaction_type)
-    
+
     if status:
         query = query.filter(Transaction.status == status)
-    
+
     if customer_id:
         query = query.filter(Transaction.customer_id == customer_id)
-    
+
     if start_date:
         query = query.filter(Transaction.transaction_date >= start_date)
-    
+
     if end_date:
         query = query.filter(Transaction.transaction_date <= end_date)
-    
+
     # Apply pagination
     query = query.order_by(Transaction.transaction_date.desc()).offset(skip).limit(limit)
-    
+
     result = await db.execute(query)
     transactions = result.scalars().all()
-    
+
     return transactions
 
 
@@ -93,7 +93,7 @@ async def create_transaction(
                 status_code=404,
                 detail="Customer not found"
             )
-    
+
     if transaction_in.employee_id:
         employee = db.query(Employee).filter(Employee.id == transaction_in.employee_id).first()
         if not employee:
@@ -101,7 +101,7 @@ async def create_transaction(
                 status_code=404,
                 detail="Employee not found"
             )
-    
+
     if transaction_in.loan_id:
         loan = db.query(Loan).filter(Loan.id == transaction_in.loan_id).first()
         if not loan:
@@ -109,7 +109,7 @@ async def create_transaction(
                 status_code=404,
                 detail="Loan not found"
             )
-    
+
     if transaction_in.item_id:
         item = db.query(Item).filter(Item.id == transaction_in.item_id).first()
         if not item:
@@ -117,10 +117,10 @@ async def create_transaction(
                 status_code=404,
                 detail="Item not found"
             )
-    
+
     # Generate transaction code
     transaction_code = generate_transaction_code()
-    
+
     # Create transaction
     db_transaction = Transaction(
         transaction_code=transaction_code,
@@ -135,14 +135,14 @@ async def create_transaction(
         loan_id=transaction_in.loan_id,
         item_id=transaction_in.item_id,
         notes=transaction_in.notes,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc)
     )
-    
+
     db.add(db_transaction)
     db.commit()
     db.refresh(db_transaction)
-    
+
     return db_transaction
 
 
@@ -157,40 +157,40 @@ def read_transaction(
     Get transaction by ID with related details.
     """
     transaction = db.query(Transaction).filter(Transaction.id == transaction_id).first()
-    
+
     if not transaction:
         raise HTTPException(
             status_code=404,
             detail="Transaction not found"
         )
-    
+
     # Get related details
-    transaction_with_details = TransactionWithDetails.from_orm(transaction)
-    
+    transaction_with_details = TransactionWithDetails.model_validate(transaction, from_attributes=True)
+
     # Add customer name if customer_id is present
     if transaction.customer_id:
         customer = db.query(Customer).filter(Customer.id == transaction.customer_id).first()
         if customer:
             transaction_with_details.customer_name = f"{customer.first_name} {customer.last_name}"
-    
+
     # Add employee name if employee_id is present
     if transaction.employee_id:
         employee = db.query(Employee).filter(Employee.id == transaction.employee_id).first()
         if employee:
             transaction_with_details.employee_name = f"{employee.first_name} {employee.last_name}"
-    
+
     # Add loan code if loan_id is present
     if transaction.loan_id:
         loan = db.query(Loan).filter(Loan.id == transaction.loan_id).first()
         if loan:
             transaction_with_details.loan_code = loan.loan_code
-    
+
     # Add item name if item_id is present
     if transaction.item_id:
         item = db.query(Item).filter(Item.id == transaction.item_id).first()
         if item:
             transaction_with_details.item_name = item.name
-    
+
     return transaction_with_details
 
 
@@ -206,32 +206,32 @@ async def update_transaction(
     Update a transaction.
     """
     transaction = db.query(Transaction).filter(Transaction.id == transaction_id).first()
-    
+
     if not transaction:
         raise HTTPException(
             status_code=404,
             detail="Transaction not found"
         )
-    
+
     # Prevent updating completed or cancelled transactions
     if transaction.status in [TransactionStatusEnum.COMPLETED.value, TransactionStatusEnum.CANCELLED.value]:
         raise HTTPException(
             status_code=400,
             detail=f"Cannot update transaction with status: {transaction.status}"
         )
-    
+
     # Update transaction data
-    update_data = transaction_in.dict(exclude_unset=True)
-    
+    update_data = transaction_in.model_dump(exclude_unset=True)
+
     for field, value in update_data.items():
         setattr(transaction, field, value)
-    
-    transaction.updated_at = datetime.utcnow()
-    
+
+    transaction.updated_at = datetime.now(timezone.utc)
+
     db.add(transaction)
     db.commit()
     db.refresh(transaction)
-    
+
     return transaction
 
 
@@ -247,32 +247,32 @@ def cancel_transaction(
     Cancel a transaction.
     """
     transaction = db.query(Transaction).filter(Transaction.id == transaction_id).first()
-    
+
     if not transaction:
         raise HTTPException(
             status_code=404,
             detail="Transaction not found"
         )
-    
+
     # Prevent cancelling already completed or cancelled transactions
     if transaction.status in [TransactionStatusEnum.COMPLETED.value, TransactionStatusEnum.CANCELLED.value]:
         raise HTTPException(
             status_code=400,
             detail=f"Cannot cancel transaction with status: {transaction.status}"
         )
-    
+
     # Update transaction status
     transaction.status = TransactionStatusEnum.CANCELLED.value
-    
+
     if notes:
-        transaction.notes = (transaction.notes or "") + f"\nCancelled on {datetime.utcnow()}: {notes}"
-    
-    transaction.updated_at = datetime.utcnow()
-    
+        transaction.notes = (transaction.notes or "") + f"\nCancelled on {datetime.now(timezone.utc)}: {notes}"
+
+    transaction.updated_at = datetime.now(timezone.utc)
+
     db.add(transaction)
     db.commit()
     db.refresh(transaction)
-    
+
     return transaction
 
 
@@ -288,32 +288,32 @@ def complete_transaction(
     Mark a transaction as completed.
     """
     transaction = db.query(Transaction).filter(Transaction.id == transaction_id).first()
-    
+
     if not transaction:
         raise HTTPException(
             status_code=404,
             detail="Transaction not found"
         )
-    
+
     # Prevent completing already completed or cancelled transactions
     if transaction.status in [TransactionStatusEnum.COMPLETED.value, TransactionStatusEnum.CANCELLED.value]:
         raise HTTPException(
             status_code=400,
             detail=f"Cannot complete transaction with status: {transaction.status}"
         )
-    
+
     # Update transaction status
     transaction.status = TransactionStatusEnum.COMPLETED.value
-    
+
     if notes:
-        transaction.notes = (transaction.notes or "") + f"\nCompleted on {datetime.utcnow()}: {notes}"
-    
-    transaction.updated_at = datetime.utcnow()
-    
+        transaction.notes = (transaction.notes or "") + f"\nCompleted on {datetime.now(timezone.utc)}: {notes}"
+
+    transaction.updated_at = datetime.now(timezone.utc)
+
     db.add(transaction)
     db.commit()
     db.refresh(transaction)
-    
+
     return transaction
 
 
@@ -330,7 +330,7 @@ def search_transactions(
     Advanced search for transactions.
     """
     query = db.query(Transaction)
-    
+
     # Apply search filters
     if search_params.search_term:
         search_term = f"%{search_params.search_term}%"
@@ -340,43 +340,43 @@ def search_transactions(
                 Transaction.reference_number.ilike(search_term)
             )
         )
-    
+
     if search_params.transaction_type:
         query = query.filter(Transaction.transaction_type == search_params.transaction_type)
-    
+
     if search_params.status:
         query = query.filter(Transaction.status == search_params.status)
-    
+
     if search_params.payment_method:
         query = query.filter(Transaction.payment_method == search_params.payment_method)
-    
+
     if search_params.min_amount is not None:
         query = query.filter(Transaction.amount >= search_params.min_amount)
-    
+
     if search_params.max_amount is not None:
         query = query.filter(Transaction.amount <= search_params.max_amount)
-    
+
     if search_params.customer_id:
         query = query.filter(Transaction.customer_id == search_params.customer_id)
-    
+
     if search_params.employee_id:
         query = query.filter(Transaction.employee_id == search_params.employee_id)
-    
+
     if search_params.loan_id:
         query = query.filter(Transaction.loan_id == search_params.loan_id)
-    
+
     if search_params.item_id:
         query = query.filter(Transaction.item_id == search_params.item_id)
-    
+
     if search_params.start_date:
         query = query.filter(Transaction.transaction_date >= search_params.start_date)
-    
+
     if search_params.end_date:
         query = query.filter(Transaction.transaction_date <= search_params.end_date)
-    
+
     # Apply pagination
     transactions = query.order_by(Transaction.transaction_date.desc()).offset(skip).limit(limit).all()
-    
+
     return transactions
 
 
@@ -391,44 +391,44 @@ def get_transaction_stats(
     Get transaction statistics.
     """
     query = db.query(Transaction)
-    
+
     # Apply date filters if provided
     if start_date:
         query = query.filter(Transaction.transaction_date >= start_date)
-    
+
     if end_date:
         query = query.filter(Transaction.transaction_date <= end_date)
-    
+
     # Total transactions and amount
     total_transactions = query.count()
     total_amount = db.query(func.sum(Transaction.amount)).filter(
         Transaction.status == TransactionStatusEnum.COMPLETED.value
     ).scalar() or 0
-    
+
     # Transactions by type
     transactions_by_type = {}
     for transaction_type in TransactionTypeEnum:
         count = query.filter(Transaction.transaction_type == transaction_type.value).count()
         transactions_by_type[transaction_type.value] = count
-    
+
     # Transactions by status
     transactions_by_status = {}
     for status in TransactionStatusEnum:
         count = query.filter(Transaction.status == status.value).count()
         transactions_by_status[status.value] = count
-    
+
     # Transactions by payment method
     transactions_by_payment_method = {}
     for payment_method in PaymentMethodEnum:
         count = query.filter(Transaction.payment_method == payment_method.value).count()
         transactions_by_payment_method[payment_method.value] = count
-    
+
     # Daily transactions (last 30 days)
     daily_transactions = []
     today = date.today()
     for i in range(30):
         day_date = today - timedelta(days=i)
-        
+
         # Count transactions on this day
         day_count = db.query(func.count(Transaction.id)).filter(
             and_(
@@ -436,7 +436,7 @@ def get_transaction_stats(
                 Transaction.status == TransactionStatusEnum.COMPLETED.value
             )
         ).scalar()
-        
+
         # Sum transaction amounts on this day
         day_amount = db.query(func.sum(Transaction.amount)).filter(
             and_(
@@ -444,19 +444,19 @@ def get_transaction_stats(
                 Transaction.status == TransactionStatusEnum.COMPLETED.value
             )
         ).scalar() or 0
-        
+
         daily_transactions.append({
             "date": day_date.isoformat(),
             "count": day_count,
             "amount": day_amount
         })
-    
+
     # Monthly transactions (last 12 months)
     monthly_transactions = []
     current_date = datetime.now()
     for i in range(12):
         month_date = current_date - timedelta(days=30 * i)
-        
+
         # Count transactions in this month
         month_count = db.query(func.count(Transaction.id)).filter(
             and_(
@@ -465,7 +465,7 @@ def get_transaction_stats(
                 Transaction.status == TransactionStatusEnum.COMPLETED.value
             )
         ).scalar()
-        
+
         # Sum transaction amounts in this month
         month_amount = db.query(func.sum(Transaction.amount)).filter(
             and_(
@@ -474,13 +474,13 @@ def get_transaction_stats(
                 Transaction.status == TransactionStatusEnum.COMPLETED.value
             )
         ).scalar() or 0
-        
+
         monthly_transactions.append({
             "month": month_date.strftime("%Y-%m"),
             "count": month_count,
             "amount": month_amount
         })
-    
+
     return {
         "total_transactions": total_transactions,
         "total_amount": total_amount,
@@ -489,4 +489,4 @@ def get_transaction_stats(
         "transactions_by_payment_method": transactions_by_payment_method,
         "daily_transactions": daily_transactions,
         "monthly_transactions": monthly_transactions
-    } 
+    }

@@ -88,6 +88,23 @@ async def login(
     # Print response headers for debugging
     print("Response headers:", response.headers)
 
+    # Fetch role information safely
+    role_dict = None
+    if user.role_id:
+        # Fetch the role explicitly to avoid relationship loading issues
+        result = await db.execute(select(Role).where(Role.id == user.role_id))
+        role = result.scalar_one_or_none()
+        if role:
+            role_dict = {
+                "id": role.id,
+                "name": role.name,
+                "description": role.description,
+                "permissions": [
+                    {"value": perm}
+                    for perm in ROLE_PERMISSIONS.get(role.name.lower(), [])
+                ]
+            }
+
     return {
         "access_token": access_token,
         "token_type": "bearer",
@@ -97,15 +114,7 @@ async def login(
             "email": user.email,
             "is_active": user.is_active,
             "is_superuser": user.is_superuser,
-            "role": {
-                "id": user.role.id,
-                "name": user.role.name,
-                "description": user.role.description,
-                "permissions": [
-                    {"value": perm}
-                    for perm in ROLE_PERMISSIONS.get(user.role.name.lower(), [])
-                ]
-            } if user.role else None
+            "role": role_dict
         }
     }
 
@@ -243,7 +252,7 @@ async def change_password(
 
 
 @router.get("/me", response_model=UserResponse)
-def read_users_me(
+async def read_users_me(
     request: Request,
     db: AsyncSession = Depends(get_async_db),
     current_user = Depends(get_current_user_with_cookie)
@@ -260,20 +269,23 @@ def read_users_me(
     current_user.first_name = current_user.first_name or ""
     current_user.last_name = current_user.last_name or ""
     current_user.is_superuser = current_user.is_superuser if current_user.is_superuser is not None else False
-    # role_id can be None
 
-    # Convert role to dictionary if it exists
+    # Fetch role information safely
     role_dict = None
-    if current_user.role:
-        role_dict = {
-            "id": current_user.role.id,
-            "name": current_user.role.name,
-            "description": current_user.role.description,
-            "permissions": [
-                {"value": perm}
-                for perm in ROLE_PERMISSIONS.get(current_user.role.name.lower(), [])
-            ]
-        }
+    if current_user.role_id:
+        # Fetch the role explicitly to avoid relationship loading issues
+        result = await db.execute(select(Role).where(Role.id == current_user.role_id))
+        role = result.scalar_one_or_none()
+        if role:
+            role_dict = {
+                "id": role.id,
+                "name": role.name,
+                "description": role.description,
+                "permissions": [
+                    {"value": perm}
+                    for perm in ROLE_PERMISSIONS.get(role.name.lower(), [])
+                ]
+            }
 
     # Create a dictionary representation of the user
     user_dict = {
@@ -305,20 +317,32 @@ async def logout(response: Response):
 
 
 @router.get("/verify")
-async def refresh_token(current_user: User = Depends(get_current_user_with_cookie)) -> Any:
+async def refresh_token(
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user_with_cookie)
+) -> Any:
+    # Fetch role information safely
+    role_dict = None
+    if current_user.role_id:
+        # Fetch the role explicitly to avoid relationship loading issues
+        result = await db.execute(select(Role).where(Role.id == current_user.role_id))
+        role = result.scalar_one_or_none()
+        if role:
+            role_dict = {
+                "id": role.id,
+                "name": role.name,
+                "description": role.description,
+                "permissions": [
+                    {"value": perm}
+                    for perm in ROLE_PERMISSIONS.get(role.name.lower(), [])
+                ]
+            }
+
     return {
         "id": current_user.id,
         "username": current_user.username,
         "email": current_user.email,
         "is_active": current_user.is_active,
         "is_superuser": current_user.is_superuser,
-        "role": {
-            "id": current_user.role.id,
-            "name": current_user.role.name,
-            "description": current_user.role.description,
-            "permissions": [
-                {"value": perm}
-                for perm in ROLE_PERMISSIONS.get(current_user.role.name.lower(), [])
-            ]
-        } if current_user.role else None
+        "role": role_dict
     }

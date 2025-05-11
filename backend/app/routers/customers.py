@@ -1,5 +1,5 @@
 from typing import Any, List, Optional
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status, Body
@@ -40,7 +40,7 @@ async def read_customers(
     Retrieve customers with optional filtering.
     """
     query = db.query(Customer)
-    
+
     # Apply filters
     if search:
         search_term = f"%{search}%"
@@ -53,13 +53,13 @@ async def read_customers(
                 Customer.customer_code.ilike(search_term)
             )
         )
-    
+
     if is_active is not None:
         query = query.filter(Customer.is_active == is_active)
-    
+
     # Apply pagination
     customers = query.order_by(Customer.created_at.desc()).offset(skip).limit(limit).all()
-    
+
     return customers
 
 
@@ -80,29 +80,29 @@ async def create_customer(
             Customer.phone == customer_in.phone
         )
     ).first()
-    
+
     if existing_customer:
         raise HTTPException(
             status_code=400,
             detail="A customer with this email or phone number already exists."
         )
-    
+
     # Generate customer code if not provided
     customer_code = customer_in.customer_code or generate_customer_code()
-    
+
     # Create customer
     db_customer = Customer(
-        **customer_in.dict(exclude={"customer_code"}),
+        **customer_in.model_dump(exclude={"customer_code"}),
         customer_code=customer_code,
         is_active=True,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc)
     )
-    
+
     db.add(db_customer)
     db.commit()
     db.refresh(db_customer)
-    
+
     return db_customer
 
 
@@ -117,13 +117,13 @@ def read_customer(
     Get customer by ID.
     """
     customer = db.query(Customer).filter(Customer.id == customer_id).first()
-    
+
     if not customer:
         raise HTTPException(
             status_code=404,
             detail="Customer not found"
         )
-    
+
     return customer
 
 
@@ -139,49 +139,49 @@ async def update_customer(
     Update a customer.
     """
     customer = db.query(Customer).filter(Customer.id == customer_id).first()
-    
+
     if not customer:
         raise HTTPException(
             status_code=404,
             detail="Customer not found"
         )
-    
+
     # Check if email is being updated and already exists
     if customer_in.email and customer_in.email != customer.email:
         existing_customer = db.query(Customer).filter(
             Customer.email == customer_in.email
         ).first()
-        
+
         if existing_customer:
             raise HTTPException(
                 status_code=400,
                 detail="A customer with this email already exists."
             )
-    
+
     # Check if phone is being updated and already exists
     if customer_in.phone and customer_in.phone != customer.phone:
         existing_customer = db.query(Customer).filter(
             Customer.phone == customer_in.phone
         ).first()
-        
+
         if existing_customer:
             raise HTTPException(
                 status_code=400,
                 detail="A customer with this phone number already exists."
             )
-    
+
     # Update customer data
-    update_data = customer_in.dict(exclude_unset=True)
-    
+    update_data = customer_in.model_dump(exclude_unset=True)
+
     for field, value in update_data.items():
         setattr(customer, field, value)
-    
-    customer.updated_at = datetime.utcnow()
-    
+
+    customer.updated_at = datetime.now(timezone.utc)
+
     db.add(customer)
     db.commit()
     db.refresh(customer)
-    
+
     return customer
 
 
@@ -196,13 +196,13 @@ async def delete_customer(
     Delete a customer.
     """
     customer = db.query(Customer).filter(Customer.id == customer_id).first()
-    
+
     if not customer:
         raise HTTPException(
             status_code=404,
             detail="Customer not found"
         )
-    
+
     # Check if customer has active loans
     active_loans = db.query(Loan).filter(
         and_(
@@ -210,20 +210,20 @@ async def delete_customer(
             Loan.status.in_(["active", "overdue"])
         )
     ).count()
-    
+
     if active_loans > 0:
         raise HTTPException(
             status_code=400,
             detail=f"Cannot delete customer with {active_loans} active loans"
         )
-    
+
     # Instead of hard delete, mark as inactive
     customer.is_active = False
-    customer.updated_at = datetime.utcnow()
-    
+    customer.updated_at = datetime.now(timezone.utc)
+
     db.add(customer)
     db.commit()
-    
+
     return customer
 
 
@@ -240,7 +240,7 @@ def search_customers(
     Advanced search for customers.
     """
     query = db.query(Customer)
-    
+
     # Apply search filters
     if search_params.search_term:
         search_term = f"%{search_params.search_term}%"
@@ -253,28 +253,28 @@ def search_customers(
                 Customer.customer_code.ilike(search_term)
             )
         )
-    
+
     if search_params.email:
         query = query.filter(Customer.email == search_params.email)
-    
+
     if search_params.phone:
         query = query.filter(Customer.phone == search_params.phone)
-    
+
     if search_params.customer_code:
         query = query.filter(Customer.customer_code == search_params.customer_code)
-    
+
     if search_params.is_active is not None:
         query = query.filter(Customer.is_active == search_params.is_active)
-    
+
     if search_params.city:
         query = query.filter(Customer.city == search_params.city)
-    
+
     if search_params.state:
         query = query.filter(Customer.state == search_params.state)
-    
+
     # Apply pagination
     customers = query.order_by(Customer.created_at.desc()).offset(skip).limit(limit).all()
-    
+
     return customers
 
 
@@ -290,29 +290,29 @@ def get_customer_stats(
     today = date.today()
     current_year = today.year
     current_month = today.month
-    
+
     # Total customers
     total_customers = db.query(func.count(Customer.id)).scalar()
-    
+
     # Active/inactive customers
     active_customers = db.query(func.count(Customer.id)).filter(Customer.is_active == True).scalar()
     inactive_customers = db.query(func.count(Customer.id)).filter(Customer.is_active == False).scalar()
-    
+
     # Customers with active loans
     customers_with_active_loans = db.query(func.count(Customer.id.distinct())).join(
         Loan, Loan.customer_id == Customer.id
     ).filter(Loan.status == "active").scalar()
-    
+
     # Customers with completed loans
     customers_with_completed_loans = db.query(func.count(Customer.id.distinct())).join(
         Loan, Loan.customer_id == Customer.id
     ).filter(Loan.status == "completed").scalar()
-    
+
     # Customers with defaulted loans
     customers_with_defaulted_loans = db.query(func.count(Customer.id.distinct())).join(
         Loan, Loan.customer_id == Customer.id
     ).filter(Loan.status == "defaulted").scalar()
-    
+
     # New customers this month/year
     new_customers_this_month = db.query(func.count(Customer.id)).filter(
         and_(
@@ -320,25 +320,25 @@ def get_customer_stats(
             extract('month', Customer.created_at) == current_month
         )
     ).scalar()
-    
+
     new_customers_this_year = db.query(func.count(Customer.id)).filter(
         extract('year', Customer.created_at) == current_year
     ).scalar()
-    
+
     # Top customers by loan count
     top_customers_by_loan_count = db.query(Customer).join(
         Loan, Loan.customer_id == Customer.id
     ).group_by(Customer.id).order_by(
         func.count(Loan.id).desc()
     ).limit(5).all()
-    
+
     # Top customers by loan amount
     top_customers_by_loan_amount = db.query(Customer).join(
         Loan, Loan.customer_id == Customer.id
     ).group_by(Customer.id).order_by(
         func.sum(Loan.loan_amount).desc()
     ).limit(5).all()
-    
+
     return {
         "total_customers": total_customers,
         "active_customers": active_customers,
@@ -350,4 +350,4 @@ def get_customer_stats(
         "new_customers_this_year": new_customers_this_year,
         "top_customers_by_loan_count": top_customers_by_loan_count,
         "top_customers_by_loan_amount": top_customers_by_loan_amount
-    } 
+    }
