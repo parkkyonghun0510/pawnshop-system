@@ -338,7 +338,7 @@ const Sidebar = ({
         {!collapsed && (
           <Box sx={{ display: 'flex', alignItems: 'center', pl: 2 }}>
             <Typography variant="h6" noWrap component="div" fontWeight="bold">
-              Pawn Shop
+              LC Cash Express
             </Typography>
           </Box>
         )}

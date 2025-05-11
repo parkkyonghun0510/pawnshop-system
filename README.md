@@ -1,4 +1,4 @@
-# Pawn Shop Management System
+# LC Management System
 
 A comprehensive management system for pawn shops, built with FastAPI and React.
 

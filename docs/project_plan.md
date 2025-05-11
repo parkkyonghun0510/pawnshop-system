@@ -1,8 +1,8 @@
-# Pawn Shop Management System - Project Plan
+# LC Management System - Project Plan
 
 ## 1. System Overview
 
-The Pawn Shop Management System is designed to be a comprehensive platform for managing multiple pawn shop branches across the country, with the potential to evolve into a microfinance or banking system. The system will control:
+The LC Management System is designed to be a comprehensive platform for managing multiple pawn shop branches across the country, with the potential to evolve into a microfinance or banking system. The system will control:
 
 - Employee/worker management
 - Financial operations and reporting

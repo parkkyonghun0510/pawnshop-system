@@ -151,7 +151,7 @@ const Header = ({ open, collapsed, drawerWidth, onDrawerToggle }: HeaderProps) =
           component="div"
           sx={{ display: { xs: 'none', sm: 'block' }, fontWeight: 600 }}
         >
-          Pawn Shop Management System
+          LC Management System
         </Typography>
 
         <SearchWrapper>

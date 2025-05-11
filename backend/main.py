@@ -10,7 +10,7 @@ load_dotenv()
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="Pawn Shop Management System API",
+    title="LC Management System API",
     description="API for managing pawn shop operations, employees, customers, and financial transactions",
     version="1.0.0"
 )
@@ -28,7 +28,7 @@ app.add_middleware(
 @app.get("/", tags=["Root"])
 async def root():
     return {
-        "message": "Welcome to Pawn Shop Management System API",
+        "message": "Welcome to LC Management System API",
         "documentation": "/docs",
         "status": "online"
     }

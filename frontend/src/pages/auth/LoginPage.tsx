@@ -31,24 +31,24 @@ const LoginPage = () => {
     e.preventDefault();
     // Reset error
     setError('');
-    
+
     // Validate form
     if (!email) {
       setError('Email is required');
       return;
     }
-    
+
     if (!password) {
       setError('Password is required');
       return;
     }
-    
+
     setLoading(true);
-    
+
     try {
       // Call login function from auth hook
       await login(email, password);
-      
+
       // Navigate to the page the user tried to access or to dashboard
       navigate(from, { replace: true });
     } catch (err) {
@@ -59,9 +59,9 @@ const LoginPage = () => {
   };
 
   return (
-    <Box 
-      sx={{ 
-        display: 'flex', 
+    <Box
+      sx={{
+        display: 'flex',
         minHeight: '100vh',
         alignItems: 'center',
         justifyContent: 'center',
@@ -70,9 +70,9 @@ const LoginPage = () => {
       }}
     >
       <Container maxWidth="sm">
-        <Paper 
-          elevation={3} 
-          sx={{ 
+        <Paper
+          elevation={3}
+          sx={{
             p: 4,
             borderRadius: 2,
             display: 'flex',
@@ -80,40 +80,40 @@ const LoginPage = () => {
             alignItems: 'center'
           }}
         >
-          <Typography 
-            component="h1" 
-            variant="h4" 
+          <Typography
+            component="h1"
+            variant="h4"
             gutterBottom
-            sx={{ 
+            sx={{
               color: 'primary.main',
               fontWeight: 600,
               mb: 3
             }}
           >
-            Pawn Shop Management System
+            LC Management System
           </Typography>
-          
-          <Typography 
-            component="h2" 
-            variant="h5" 
+
+          <Typography
+            component="h2"
+            variant="h5"
             gutterBottom
             sx={{ mb: 3 }}
           >
             Login
           </Typography>
-          
+
           {error && (
-            <Alert 
-              severity="error" 
+            <Alert
+              severity="error"
               sx={{ mb: 3, width: '100%' }}
             >
               {error}
             </Alert>
           )}
-          
-          <Box 
-            component="form" 
-            onSubmit={handleSubmit} 
+
+          <Box
+            component="form"
+            onSubmit={handleSubmit}
             sx={{ width: '100%' }}
           >
             <TextField
@@ -129,7 +129,7 @@ const LoginPage = () => {
               onChange={(e) => setEmail(e.target.value)}
               disabled={loading}
             />
-            
+
             <TextField
               margin="normal"
               required
@@ -144,7 +144,7 @@ const LoginPage = () => {
               disabled={loading}
               sx={{ mb: 3 }}
             />
-            
+
             <Button
               type="submit"
               fullWidth
@@ -154,7 +154,7 @@ const LoginPage = () => {
             >
               {loading ? <CircularProgress size={24} /> : 'Sign In'}
             </Button>
-            
+
             <Grid container justifyContent="center">
               <Grid item>
                 <Link href="#" variant="body2" onClick={(e) => { e.preventDefault(); }}>
@@ -164,7 +164,7 @@ const LoginPage = () => {
             </Grid>
           </Box>
         </Paper>
-        
+
         <Box sx={{ mt: 3, textAlign: 'center' }}>
           <Typography variant="body2" color="text.secondary">
             &copy; {new Date().getFullYear()} Pawn Shop Inc. All rights reserved.

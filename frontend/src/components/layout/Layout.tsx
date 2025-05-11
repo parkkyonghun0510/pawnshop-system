@@ -281,7 +281,7 @@ const Layout = () => {
           </IconButton>
 
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            Pawn Shop Management System
+            LC Management System
           </Typography>
 
           {/* Notifications */}

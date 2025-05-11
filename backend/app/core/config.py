@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Pawn Shop Management System"
+    PROJECT_NAME: str = "LC Cash Express"
     API_VERSION: str = os.getenv("API_VERSION", "v1")
     API_V1_STR: str = f"/api/{API_VERSION}"
     PREFECT_API_URL: str = os.getenv("PREFECT_API_URL", "http://localhost:4200/api")
@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     EMAILS_FROM_NAME: Optional[str] = None
 
     # Company settings
-    COMPANY_NAME: str = "Pawn Shop Inc."
+    COMPANY_NAME: str = "LC CASH EXPRESS PLC."
     COMPANY_LOGO: Optional[str] = None
     
     # Application settings

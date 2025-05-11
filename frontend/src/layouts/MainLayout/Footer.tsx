@@ -35,7 +35,7 @@ const Footer = ({ open, collapsed, drawerWidth }: FooterProps) => {
     <FooterWrapper open={open} collapsed={collapsed} drawerWidth={drawerWidth}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="body2" color="text.secondary">
-          &copy; {currentYear} Pawn Shop Management System. All rights reserved.
+          &copy; {currentYear} LC Management System. All rights reserved.
         </Typography>
 
         <Box sx={{ display: 'flex', gap: 2 }}>
